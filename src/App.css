@@ -459,3 +459,205 @@ input[type=number] { -moz-appearance: textfield; appearance: textfield; }
     transform-origin: 0 0;
   }
 }
+
+/* ════════════════════════════════════════════════════════════════════
+   Order Pulling — scan gate + pick list
+   ════════════════════════════════════════════════════════════════════ */
+
+/* ── Scan gate (load a sales order) ─────────────────────────────────── */
+.scan-gate {
+  display: flex;
+  justify-content: center;
+  padding-top: 4vh;
+}
+.scan-card {
+  background: var(--bg);
+  border: .5px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  padding: 2.25rem 2rem;
+  max-width: 480px;
+  width: 100%;
+}
+.scan-card-eyebrow {
+  font-size: 11px; font-weight: 600; color: var(--text3);
+  text-transform: uppercase; letter-spacing: .07em; margin-bottom: 10px;
+}
+.scan-card-title { font-size: 20px; font-weight: 600; color: var(--text); margin-bottom: 6px; }
+.scan-card-sub   { font-size: 13px; color: var(--text2); line-height: 1.6; margin-bottom: 1.5rem; }
+
+.scan-gate-input-row { display: flex; gap: 10px; }
+.scan-gate-input {
+  flex: 1;
+  font-family: inherit;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: .01em;
+  color: var(--text);
+  background: var(--bg);
+  border: 1.5px solid var(--border2);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+}
+.scan-gate-input:focus { border-color: var(--success); box-shadow: 0 0 0 3px rgba(59,109,17,.12); }
+.scan-gate-btn { white-space: nowrap; }
+.scan-gate-error {
+  margin-top: 14px;
+  background: var(--red-bg);
+  border: .5px solid rgba(163,45,45,.25);
+  color: var(--danger);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  font-size: 13px;
+}
+.scan-gate-hint { margin-top: 14px; font-size: 12px; color: var(--text3); line-height: 1.5; }
+
+/* ── Pick list — controls row ───────────────────────────────────────── */
+.pl-wrap { display: flex; flex-direction: column; gap: 16px; }
+
+.pl-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+.pl-meta { display: flex; flex-direction: column; gap: 4px; }
+.pl-meta-row { display: flex; align-items: baseline; gap: 10px; font-size: 14px; }
+.pl-meta-label { color: var(--text2); min-width: 96px; }
+.pl-meta-val   { font-weight: 600; color: var(--text); }
+
+.pl-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+.pl-totals { display: flex; flex-direction: column; gap: 2px; text-align: right; }
+.pl-total-row { display: flex; gap: 10px; justify-content: flex-end; font-size: 13.5px; }
+.pl-total-label { color: var(--text2); }
+.pl-total-val { font-weight: 600; color: var(--text); font-variant-numeric: tabular-nums; min-width: 48px; text-align: right; }
+.pl-carrier { color: var(--text2); font-style: italic; }
+.pl-clear { align-self: flex-end; }
+
+/* ── Scan bar (the focused green field) ─────────────────────────────── */
+.pl-scanbar {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  background: var(--bg);
+  border: 1.5px solid var(--success);
+  box-shadow: 0 0 0 3px rgba(59,109,17,.10);
+  border-radius: var(--radius);
+  padding: 12px 16px;
+}
+.pl-scan-label { font-size: 12px; font-weight: 600; color: var(--success); text-transform: uppercase; letter-spacing: .06em; white-space: nowrap; }
+.pl-scan-input {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: 16px;
+  color: var(--text);
+  background: transparent;
+  border: none;
+  outline: none;
+  min-width: 120px;
+}
+.pl-scan-input::placeholder { color: var(--text3); font-family: var(--font-sans); }
+.pl-scan-hint { font-size: 12px; color: var(--text3); white-space: nowrap; font-variant-numeric: tabular-nums; }
+
+/* ── Banners ────────────────────────────────────────────────────────── */
+.pl-banner {
+  display: flex; align-items: center; gap: 10px;
+  border-radius: var(--radius);
+  padding: 12px 16px;
+  font-size: 14px;
+  font-weight: 500;
+}
+.pl-banner-icon { font-weight: 700; }
+.pl-banner-error { background: var(--red-bg); border: .5px solid rgba(163,45,45,.3); color: var(--danger); }
+.pl-banner-done  { background: var(--green-bg); border: .5px solid rgba(59,109,17,.3); color: var(--success); }
+
+/* ── Pick list table ────────────────────────────────────────────────── */
+.pl-table-wrap {
+  background: var(--bg);
+  border: .5px solid var(--border);
+  border-radius: var(--radius-lg);
+  overflow-x: auto;
+}
+.pl-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.pl-table thead th {
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .06em;
+  color: var(--text3);
+  background: var(--bg2);
+  border-bottom: .5px solid var(--border);
+  white-space: nowrap;
+}
+.pl-table tbody td {
+  padding: 10px 12px;
+  border-bottom: .5px solid var(--border);
+  color: var(--text);
+  vertical-align: middle;
+}
+.pl-num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.pl-table thead th.pl-num { text-align: right; }
+.pl-item { font-weight: 600; white-space: nowrap; }
+.pl-desc { color: var(--text2); }
+.pl-muted { color: var(--text3); }
+
+/* Light-blue zebra striping (matches the spreadsheet pick list). */
+.pl-row-open:nth-of-type(odd) td   { background: #eef5fa; }
+.pl-row-open:nth-of-type(even) td  { background: var(--bg); }
+.pl-row-partial td { background: #fff8e6; }
+.pl-row-done td    { background: #eef6e6; color: var(--text2); }
+
+.pl-left { font-weight: 600; }
+.pl-left-done { color: var(--success); }
+
+.pl-lots { font-size: 11px; color: var(--text3); margin-top: 3px; font-family: var(--font-mono); }
+
+/* ── Scan log ───────────────────────────────────────────────────────── */
+.pl-log { }
+.pl-log-toggle {
+  background: none; border: none; cursor: pointer;
+  font-family: inherit; font-size: 13px; font-weight: 600; color: var(--text2);
+  padding: 4px 0;
+}
+.pl-log-toggle:hover { color: var(--text); }
+.pl-log-body {
+  margin-top: 8px;
+  background: var(--bg);
+  border: .5px solid var(--border);
+  border-radius: var(--radius);
+  overflow-x: auto;
+}
+.pl-log-empty { padding: 14px 16px; color: var(--text3); font-size: 13px; }
+.pl-log-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.pl-log-table th {
+  padding: 8px 12px; text-align: left; font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .06em; color: var(--text3);
+  background: var(--bg2); border-bottom: .5px solid var(--border);
+}
+.pl-log-table td { padding: 8px 12px; border-bottom: .5px solid var(--border); color: var(--text); }
+
+/* ── Mobile ─────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .pl-top { flex-direction: column; gap: 14px; }
+  .pl-actions { align-items: stretch; width: 100%; }
+  .pl-totals { text-align: left; }
+  .pl-total-row { justify-content: space-between; }
+  .pl-clear, .pl-actions > .btn { align-self: stretch; justify-content: center; }
+  .pl-scanbar { flex-wrap: wrap; }
+  .pl-scan-hint { width: 100%; }
+  .scan-gate-input-row { flex-direction: column; }
+}
+
+/* ── Disable zoom gestures (pinch + double-tap) ─────────────────────── */
+html, body {
+  touch-action: pan-x pan-y;   /* allow scrolling, block pinch-zoom */
+  -ms-touch-action: pan-x pan-y;
+}

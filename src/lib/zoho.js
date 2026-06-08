@@ -1,6 +1,5 @@
-// API helpers for the Order Entry App.
-// All network calls go through Netlify serverless functions so credentials
-// (Zoho OAuth + Anthropic API key) never reach the browser.
+// API helper for the Order Pulling app. The network call goes through a Netlify
+// serverless function so Zoho OAuth credentials never reach the browser.
 
 const API_BASE = '/.netlify/functions';
 
@@ -17,95 +16,8 @@ async function apiFetch(path, options = {}) {
   return res.json();
 }
 
-// ── Customers ────────────────────────────────────────────────────────────────
-export async function fetchAllCustomers() {
-  return apiFetch('/zoho-customers');
-}
-
-export async function fetchCustomer(customerId) {
-  return apiFetch(`/zoho-customer?id=${encodeURIComponent(customerId)}`);
-}
-
-// Adds a new shipping address to the customer's contact record in Zoho.
-export async function addCustomerAddress(customerId, address) {
-  return apiFetch('/zoho-add-address', {
-    method: 'POST',
-    body: JSON.stringify({ customer_id: customerId, address }),
-  });
-}
-
-// ── Items ────────────────────────────────────────────────────────────────────
-export async function fetchItemDetailsBySku(skus) {
-  if (!skus || !skus.length) return [];
-  const attempts = 3;
-  let lastErr;
-  for (let a = 0; a < attempts; a++) {
-    try {
-      const res = await apiFetch('/zoho-items-by-sku', {
-        method: 'POST',
-        body: JSON.stringify({ skus }),
-      });
-      const arr = Array.isArray(res) ? res : [];
-      // Retry if the result looks transiently incomplete: nothing came back,
-      // every item is missing all Zoho detail fields, OR some requested SKU is
-      // absent from the response (a dropped lookup we'd otherwise lose silently).
-      const returned = new Set(arr.map(d => d && d.sku));
-      const missingSome = skus.some(s => !returned.has(s));
-      const noneUsable = arr.length === 0 || arr.every(d =>
-        (d.unitsPerCase === '' || d.unitsPerCase == null) &&
-        (d.weightPerCase === '' || d.weightPerCase == null) &&
-        (d.availableStock == null)
-      );
-      const incomplete = noneUsable || missingSome;
-      if (!incomplete || a === attempts - 1) return arr;
-    } catch (e) {
-      lastErr = e;
-      if (a === attempts - 1) throw e;
-    }
-    await new Promise(r => setTimeout(r, 400 * Math.pow(2, a) + Math.random() * 200));
-  }
-  if (lastErr) throw lastErr;
-  return [];
-}
-
-// ── Claude (Sonnet) PO analysis ──────────────────────────────────────────────
-export async function analyzePo({ fileBase64, mediaType, customers }) {
-  return apiFetch('/po-analyze', {
-    method: 'POST',
-    body: JSON.stringify({ fileBase64, mediaType, customers }),
-  });
-}
-
-export async function matchOrder({ lineItems, catalog }) {
-  return apiFetch('/po-match', {
-    method: 'POST',
-    body: JSON.stringify({ lineItems, catalog }),
-  });
-}
-
-// ── Sales order ──────────────────────────────────────────────────────────────
-export async function createSalesOrder(order) {
-  return apiFetch('/zoho-create-salesorder', {
-    method: 'POST',
-    body: JSON.stringify(order),
-  });
-}
-
-export async function checkDuplicatePo({ customerId, poNumber }) {
-  const qs = `?customer_id=${encodeURIComponent(customerId)}&po_number=${encodeURIComponent(poNumber)}`;
-  return apiFetch(`/zoho-check-po${qs}`);
-}
-
-export async function attachSalesOrderPdf({ salesorderId, filename, pdfBase64 }) {
-  return apiFetch('/zoho-attach-salesorder', {
-    method: 'POST',
-    body: JSON.stringify({ salesorder_id: salesorderId, filename, pdf_base64: pdfBase64, content_type: 'application/pdf' }),
-  });
-}
-
-export async function attachSalesOrderFile({ salesorderId, filename, fileBase64, contentType }) {
-  return apiFetch('/zoho-attach-salesorder', {
-    method: 'POST',
-    body: JSON.stringify({ salesorder_id: salesorderId, filename, file_base64: fileBase64, content_type: contentType }),
-  });
+// Look up a sales order by its (scanned) number. Returns the order with
+// line items enriched with units-per-case and a cases total.
+export async function fetchSalesOrder(number) {
+  return apiFetch(`/zoho-salesorder?number=${encodeURIComponent(number)}`);
 }
