@@ -1,0 +1,368 @@
+/* ─── Design Tokens — exact match to Bill Upload ─────────────────── */
+:root {
+  --bg:      #fff;
+  --bg2:     #f7f7f5;
+  --text:    #1a1a1a;
+  --text2:   #6b6b6b;
+  --text3:   #9a9a9a;
+  --border:  rgba(0,0,0,.12);
+  --border2: rgba(0,0,0,.22);
+  --success: #3b6d11;
+  --danger:  #a32d2d;
+  --warn-bg: #fef9ec;
+  --warn:    #7a5700;
+  --radius:  8px;
+  --radius-lg: 12px;
+
+  /* extras used by the portal */
+  --readonly-bg:     #f7f7f5;
+  --readonly-border: rgba(0,0,0,.09);
+  --readonly-text:   #9a9a9a;
+  --accent:          #1a1a1a;
+  --accent-glow:     rgba(0,0,0,.06);
+  --green:           #3b6d11;
+  --green-bg:        #eaf3de;
+  --red:             #a32d2d;
+  --red-bg:          #fcebeb;
+  --font-sans:       -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  --font-mono:       'SF Mono', 'Fira Mono', 'Courier New', monospace;
+  --shadow-sm:       0 1px 3px rgba(0,0,0,.07);
+  --shadow:          0 4px 16px rgba(0,0,0,.08);
+  --shadow-md:       0 2px 8px rgba(0,0,0,.08);
+}
+
+/* ─── Reset ───────────────────────────────────────────────────────── */
+*,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { font-size: 14px; }
+body {
+  font-family: var(--font-sans);
+  background: var(--bg2);
+  color: var(--text);
+  min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ─── App Shell ───────────────────────────────────────────────────── */
+.app { display: flex; flex-direction: column; min-height: 100vh; }
+
+/* Header — exact Bill Upload styling */
+.app-header {
+  background: var(--bg);
+  border-bottom: .5px solid var(--border);
+  padding: 0 2rem;
+  display: flex;
+  align-items: center;
+  height: 56px;
+  gap: 10px;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.header-inner {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  width: 100%;
+}
+.header-logo { height: 28px; width: auto; }
+.header-divider {
+  width: 1px;
+  height: 24px;
+  background: rgba(0,0,0,.15);
+  margin: 0 12px;
+  display: inline-block;
+  flex-shrink: 0;
+}
+.header-page-title {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.app-main {
+  flex: 1;
+  max-width: 1400px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 2rem 1.5rem 4rem;
+}
+
+/* ─── Buttons — exact Bill Upload ─────────────────────────────────── */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 9px 18px;
+  border-radius: var(--radius);
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  border: .5px solid var(--border2);
+  background: var(--bg);
+  color: var(--text);
+  font-family: inherit;
+  transition: background .15s;
+  white-space: nowrap;
+}
+.btn:hover { background: var(--bg2); }
+.btn:active { transform: scale(.98); }
+.btn:disabled { opacity: .4; cursor: not-allowed; transform: none; }
+
+/* Primary = Bill Upload's .btn.p */
+.btn-primary {
+  background: var(--text);
+  color: var(--bg);
+  border-color: var(--text);
+}
+.btn-primary:hover:not(:disabled) { opacity: .85; background: var(--text); }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--text2);
+  border-color: var(--border);
+}
+.btn-ghost:hover:not(:disabled) { background: var(--bg2); color: var(--text); }
+
+.btn-danger {
+  background: transparent;
+  color: var(--danger);
+  border-color: transparent;
+}
+.btn-danger:hover:not(:disabled) { background: var(--red-bg); }
+
+.btn-sm { padding: 6px 12px; font-size: 13px; }
+
+/* ─── Form Fields ─────────────────────────────────────────────────── */
+.field-group { display: flex; flex-direction: column; gap: 4px; }
+.field-label {
+  font-size: 12px;
+  color: var(--text2);
+  font-weight: 500;
+}
+.field-input {
+  font-family: inherit;
+  font-size: 14px;
+  color: var(--text);
+  background: var(--bg);
+  border: .5px solid var(--border2);
+  border-radius: var(--radius);
+  padding: 8px 10px;
+  width: 100%;
+  outline: none;
+  transition: border-color .15s;
+}
+.field-input:focus { border-color: var(--text); }
+.field-input.readonly {
+  background: var(--bg2);
+  border-color: var(--border);
+  color: var(--text3);
+  cursor: default;
+}
+
+/* ─── Sections / Cards ────────────────────────────────────────────── */
+.section {
+  background: var(--bg);
+  border: .5px solid var(--border);
+  border-radius: var(--radius-lg);
+  margin-bottom: 1rem;
+  overflow: hidden;
+}
+.section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: .875rem 1.5rem;
+  border-bottom: .5px solid var(--border);
+  background: var(--bg);
+}
+.section-title {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: .07em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.section-title-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--text);
+}
+.section-body { padding: 1.25rem 1.5rem; }
+
+/* ─── Grids ───────────────────────────────────────────────────────── */
+.field-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px,1fr)); gap: 12px; }
+.field-grid-2 { grid-template-columns: 1fr 1fr; gap: 12px; }
+.field-grid-3 { grid-template-columns: 1fr 1fr 1fr; gap: 12px; }
+.field-grid-4 { grid-template-columns: repeat(4,1fr); gap: 12px; }
+
+@media (max-width: 768px) {
+  .field-grid,.field-grid-2,.field-grid-3,.field-grid-4 { grid-template-columns: 1fr; }
+  .app-main { padding: 1rem 1rem 3rem; }
+  .app-header { height: 80px; padding-top: 8px; }
+}
+
+/* ─── Badges ──────────────────────────────────────────────────────── */
+.badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 99px;
+  letter-spacing: .02em;
+}
+.badge-blue  { background: #e8f0fe; color: #1a56db; }
+.badge-green { background: #eaf3de; color: var(--success); }
+.badge-gray  { background: var(--bg2); color: var(--text3); border: .5px solid var(--border); }
+
+/* ─── Toast ───────────────────────────────────────────────────────── */
+.toast-container {
+  position: fixed; bottom: 1.5rem; right: 1.5rem;
+  display: flex; flex-direction: column; gap: 8px; z-index: 9999;
+}
+.toast {
+  background: var(--bg);
+  border: .5px solid var(--border2);
+  border-radius: var(--radius);
+  padding: .75rem 1rem;
+  font-size: 13px;
+  min-width: 240px;
+  box-shadow: 0 4px 16px rgba(0,0,0,.1);
+  animation: slideUp .2s ease;
+  display: flex; align-items: center; gap: 8px;
+  color: var(--text);
+}
+.toast-success { border-left: 3px solid var(--success); }
+.toast-error   { border-left: 3px solid var(--danger); }
+@keyframes slideUp {
+  from { transform: translateY(10px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+
+/* ─── Spinner — exact Bill Upload ─────────────────────────────────── */
+.spinner {
+  width: 16px; height: 16px;
+  border: 2px solid var(--border2);
+  border-top-color: var(--text);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  display: inline-block;
+  flex-shrink: 0;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.loading-state {
+  display: flex; align-items: center; justify-content: center;
+  gap: 8px; padding: 3rem; color: var(--text2); font-size: 13px;
+}
+
+/* ─── Modal ───────────────────────────────────────────────────────── */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.35);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000; padding: 1rem;
+  animation: fadeIn .15s ease;
+}
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+.modal {
+  background: var(--bg);
+  border: .5px solid var(--border2);
+  border-radius: var(--radius-lg);
+  width: 100%; max-width: 520px;
+  box-shadow: 0 8px 32px rgba(0,0,0,.12);
+  animation: scaleIn .15s ease;
+}
+@keyframes scaleIn {
+  from { transform: scale(.98); opacity: 0; }
+  to   { transform: scale(1);   opacity: 1; }
+}
+.modal-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 1rem 1.25rem;
+  border-bottom: .5px solid var(--border);
+}
+.modal-title { font-size: 14px; font-weight: 600; color: var(--text); }
+.modal-body  { padding: 1.25rem; display: flex; flex-direction: column; gap: 12px; }
+.modal-footer {
+  display: flex; justify-content: flex-end; gap: 8px;
+  padding: 1rem 1.25rem;
+  border-top: .5px solid var(--border);
+}
+.modal-close {
+  background: none; border: none;
+  color: var(--text3); cursor: pointer;
+  font-size: 1.1rem; line-height: 1; padding: 2px;
+  transition: color .12s;
+}
+.modal-close:hover { color: var(--text); }
+
+/* ─── Scrollbar ───────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 3px; }
+
+/* Hide number input spinners */
+input[type=number]::-webkit-inner-spin-button,
+input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+input[type=number] { -moz-appearance: textfield; appearance: textfield; }
+
+/* ─── Order Entry — upload dropzone ───────────────────────────────── */
+.dropzone {
+  border: 1.5px dashed var(--border2);
+  border-radius: var(--radius-lg);
+  background: var(--bg);
+  padding: 3rem 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color .15s, background .15s;
+}
+.dropzone:hover { border-color: var(--text); background: var(--bg2); }
+.dropzone.drag  { border-color: var(--text); background: var(--accent-glow); }
+.dropzone-icon  { width: 40px; height: 40px; color: var(--text3); margin: 0 auto .75rem; }
+.dropzone-title { font-size: 15px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.dropzone-sub   { font-size: 12px; color: var(--text2); }
+
+/* ─── Order Entry — summary metrics ───────────────────────────────── */
+.metric-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1px;
+  background: var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+@media (max-width: 768px) { .metric-grid { grid-template-columns: repeat(2, 1fr); } }
+.metric {
+  background: var(--bg2);
+  padding: 12px 14px;
+}
+.metric-label {
+  font-size: 10.5px; font-weight: 600; color: var(--text3);
+  text-transform: uppercase; letter-spacing: .06em; margin-bottom: 4px;
+}
+.metric-value { font-size: 18px; font-weight: 600; color: var(--text); }
+.metric-value small { font-size: 12px; font-weight: 500; color: var(--text2); }
+
+/* ─── Order Entry — items table (mirrors pricing table look) ───────── */
+.ot-table { width: 100%; border-collapse: collapse; font-size: 13px;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; }
+.ot-th { padding: 7px 10px; text-align: left; font-size: 11px; font-weight: 600;
+  text-transform: uppercase; letter-spacing: .07em; color: var(--text3);
+  background: var(--bg2); border-bottom: .5px solid var(--border); white-space: nowrap; }
+.ot-td { padding: 7px 10px; border-bottom: .5px solid var(--border); color: var(--text);
+  vertical-align: middle; background: var(--bg); font-size: 13px; }
+.ot-row:hover td { background: var(--bg2); }
+.ot-num { text-align: right; font-variant-numeric: tabular-nums; }
+.ot-item { font-weight: 600; }
+.ot-edit { width: 64px; text-align: right; font-family: inherit; font-size: 13px;
+  border: .5px solid var(--border2); border-radius: 6px; padding: 4px 6px; color: var(--text);
+  background: var(--bg); outline: none; }
+.ot-edit:focus { border-color: var(--text); }
+.ot-foot td { padding: 9px 10px; font-weight: 600; background: var(--bg2);
+  border-top: .5px solid var(--border2); }
+
+.excluded-row { background: var(--warn-bg); }
+.excluded-row td { color: var(--warn); font-size: 12px; }
