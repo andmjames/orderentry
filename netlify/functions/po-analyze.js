@@ -110,6 +110,7 @@ Notes:
     const payload = {
       model: ANTHROPIC_MODEL,
       max_tokens: 4096,
+      temperature: 0,
       messages: [
         { role: 'user', content: [ fileBlock, { type: 'text', text: prompt } ] },
       ],

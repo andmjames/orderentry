@@ -73,6 +73,7 @@ Every PO line must appear in exactly one of the two arrays. ordered_quantity mus
     const payload = {
       model: ANTHROPIC_MODEL,
       max_tokens: 4096,
+      temperature: 0,
       messages: [ { role: 'user', content: prompt } ],
     };
 

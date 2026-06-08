@@ -38,15 +38,18 @@ export async function fetchItemDetailsBySku(skus) {
         body: JSON.stringify({ skus }),
       });
       const arr = Array.isArray(res) ? res : [];
-      // Treat a systemically-empty result (nothing came back, or every item is
-      // missing all Zoho detail fields) as a transient failure worth retrying —
-      // that's the "all columns blank / no units/case" symptom.
+      // Retry if the result looks transiently incomplete: nothing came back,
+      // every item is missing all Zoho detail fields, OR some requested SKU is
+      // absent from the response (a dropped lookup we'd otherwise lose silently).
+      const returned = new Set(arr.map(d => d && d.sku));
+      const missingSome = skus.some(s => !returned.has(s));
       const noneUsable = arr.length === 0 || arr.every(d =>
         (d.unitsPerCase === '' || d.unitsPerCase == null) &&
         (d.weightPerCase === '' || d.weightPerCase == null) &&
         (d.availableStock == null)
       );
-      if (!noneUsable || a === attempts - 1) return arr;
+      const incomplete = noneUsable || missingSome;
+      if (!incomplete || a === attempts - 1) return arr;
     } catch (e) {
       lastErr = e;
       if (a === attempts - 1) throw e;

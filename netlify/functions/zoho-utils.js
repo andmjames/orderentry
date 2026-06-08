@@ -4,6 +4,8 @@
 let cachedToken = null;
 let tokenExpiry = 0;
 
+const _sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
 function getZohoDomain() {
   // Set ZOHO_DOMAIN in Netlify env vars if not on US servers, e.g.:
   //   zoho.eu        → EU
@@ -15,47 +17,74 @@ function getZohoDomain() {
 
 const DEFAULT_SCOPE = 'ZohoInventory.contacts.READ,ZohoInventory.contacts.UPDATE,ZohoInventory.items.READ,ZohoInventory.salesorders.CREATE,ZohoInventory.salesorders.READ';
 
-async function getZohoAccessToken() {
-  if (cachedToken && Date.now() < tokenExpiry) return cachedToken;
-
-  const domain = getZohoDomain();
-  const tokenUrl = `https://accounts.${domain}/oauth/v2/token`;
-
-  let params;
+function buildTokenParams() {
   if (process.env.ZOHO_REFRESH_TOKEN) {
     // Refresh-token grant (requires a one-time grant code to mint the refresh token).
-    params = new URLSearchParams({
+    return new URLSearchParams({
       refresh_token: process.env.ZOHO_REFRESH_TOKEN,
       client_id:     process.env.ZOHO_CLIENT_ID,
       client_secret: process.env.ZOHO_CLIENT_SECRET,
       grant_type:    'refresh_token',
     });
-  } else {
-    // Client-credentials grant — no grant code or refresh token needed.
-    // Requires ZOHO_ORGANIZATION_ID (used as the soid) and the desired scopes.
-    params = new URLSearchParams({
-      client_id:     process.env.ZOHO_CLIENT_ID,
-      client_secret: process.env.ZOHO_CLIENT_SECRET,
-      grant_type:    'client_credentials',
-      scope:         process.env.ZOHO_SCOPE || DEFAULT_SCOPE,
-      soid:          `ZohoInventory.${process.env.ZOHO_ORGANIZATION_ID}`,
-    });
   }
+  // Client-credentials grant — no grant code or refresh token needed.
+  return new URLSearchParams({
+    client_id:     process.env.ZOHO_CLIENT_ID,
+    client_secret: process.env.ZOHO_CLIENT_SECRET,
+    grant_type:    'client_credentials',
+    scope:         process.env.ZOHO_SCOPE || DEFAULT_SCOPE,
+    soid:          `ZohoInventory.${process.env.ZOHO_ORGANIZATION_ID}`,
+  });
+}
 
-  console.log(`[zoho] Fetching token from: ${tokenUrl} (grant=${params.get('grant_type')})`);
+// Mint a fresh access token. Zoho rate-limits the token endpoint hard
+// ("You have made too many requests continuously"), so when we hit that we
+// wait and retry with exponential backoff instead of failing the request.
+async function requestNewToken() {
+  const domain   = getZohoDomain();
+  const tokenUrl = `https://accounts.${domain}/oauth/v2/token`;
+  const params   = buildTokenParams();
+  const attempts = 4;
+  let lastBody = '';
 
-  const res  = await fetch(`${tokenUrl}?${params}`, { method: 'POST' });
-  const data = await res.json();
+  for (let a = 0; a < attempts; a++) {
+    let data = {};
+    try {
+      const res = await fetch(`${tokenUrl}?${params}`, { method: 'POST' });
+      data = await res.json().catch(() => ({}));
+    } catch (e) {
+      data = { error: e.message };
+    }
+    if (data.access_token) return data;
 
-  console.log(`[zoho] Token response keys: ${Object.keys(data).join(', ')}`);
-
-  if (!data.access_token) {
-    throw new Error(`Failed to get Zoho access token from ${tokenUrl}: ${JSON.stringify(data)}`);
+    lastBody = JSON.stringify(data);
+    const rateLimited = /too many requests/i.test(lastBody) || /access denied/i.test(lastBody);
+    console.log(`[zoho] token attempt ${a + 1} failed${rateLimited ? ' (rate limited)' : ''}: ${lastBody}`);
+    if (a < attempts - 1 && rateLimited) {
+      await _sleep(1500 * Math.pow(2, a) + Math.random() * 500); // ~1.5s, 3s, 6s
+      continue;
+    }
+    break;
   }
+  throw new Error(`Failed to get Zoho access token from ${tokenUrl}: ${lastBody}`);
+}
 
-  cachedToken = data.access_token;
-  tokenExpiry = Date.now() + ((data.expires_in || 3600) - 60) * 1000;
-  return cachedToken;
+async function getZohoAccessToken() {
+  if (cachedToken && Date.now() < tokenExpiry) return cachedToken;
+  try {
+    const data = await requestNewToken();
+    cachedToken = data.access_token;
+    tokenExpiry = Date.now() + ((data.expires_in || 3600) - 60) * 1000;
+    return cachedToken;
+  } catch (e) {
+    // If we still hold a recently-issued token (we expire it 60s early), reuse it
+    // as a last resort rather than blocking the user when the token endpoint is busy.
+    if (cachedToken && Date.now() < tokenExpiry + 120000) {
+      console.warn('[zoho] token mint failed; reusing last token:', e.message);
+      return cachedToken;
+    }
+    throw e;
+  }
 }
 
 async function zohoGet(path) {

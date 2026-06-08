@@ -184,11 +184,12 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
   const effectiveMethod  = methodNameOverride != null ? methodNameOverride : (shipping.shippingMethod || '');
   const effectiveAccount = accountOverride != null ? accountOverride : (shipping.shippingAccount || '');
 
-  // Hide an "excluded" PO line once that item exists on the customer's price
-  // list (catalog) or has been added to the order — matched by item number/alias.
+  // Hide an "excluded" PO line only once that item is actually in the order
+  // (matched, or added via "+ Add Item") — matched by item number/alias.
+  // We deliberately do NOT hide just because the item is on the price list:
+  // an on-list item that the matcher missed must stay visible, not vanish.
   const normKey = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
   const knownKeys = new Set();
-  catalog.forEach(c => { if (c.item_number) knownKeys.add(normKey(c.item_number)); if (c.alias) knownKeys.add(normKey(c.alias)); });
   lines.forEach(l => { if (l.item_number) knownKeys.add(normKey(l.item_number)); if (l.alias) knownKeys.add(normKey(l.alias)); });
   const visibleExcluded = excluded.filter(e => {
     const id = normKey(e.identifier);
