@@ -86,6 +86,8 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
   const [showRemarks, setShowRemarks] = useState(false);
   const [excluded, setExcluded] = useState([]);
   const [methodOverride, setMethodOverride] = useState(null);
+  const [methodNameOverride, setMethodNameOverride] = useState(null); // manual carrier/method text
+  const [accountOverride, setAccountOverride] = useState(null);       // manual shipping account #
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [approved, setApproved] = useState(false);
@@ -96,6 +98,7 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
     if (!id) { setCustomer(null); setLines([]); setExcluded([]); return; }
     setLoading(true); setError(null); setResult(null); setApproved(false);
     setMethodOverride(null); setShowPicker(false); setFreightOverride(null);
+    setMethodNameOverride(null); setAccountOverride(null);
     setPalletData(null); setShowPallet(false); setShowRemarks(false);
     try {
       const cust = await fetchCustomer(id);
@@ -178,6 +181,8 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
   };
   const shipping = computeShipping(customer, totals, methodOverride, poAccounts);
   const effectiveFreight = freightOverride != null ? freightOverride : shipping.freightCharge;
+  const effectiveMethod  = methodNameOverride != null ? methodNameOverride : (shipping.shippingMethod || '');
+  const effectiveAccount = accountOverride != null ? accountOverride : (shipping.shippingAccount || '');
 
   // Hide an "excluded" PO line once that item exists on the customer's price
   // list (catalog) or has been added to the order — matched by item number/alias.
@@ -312,8 +317,8 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
           unit: l.unit || '',
         })),
         shipping_charge: effectiveFreight,
-        delivery_method: shipping.shippingMethod || '',
-        comment: `Pallets: ${shipping.pallets} • Weight: ${shipping.weight} lb • Cases: ${totals.cases}`,
+        delivery_method: effectiveMethod || '',
+        comment: `Pallets: ${shipping.pallets} • Weight: ${shipping.weight} lb • Cases: ${totals.cases}${effectiveAccount ? ` • Acct: ${effectiveAccount}` : ''}`,
       };
 
       if (selectedAddr?.addr) {
@@ -530,6 +535,14 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
             freightOverridden={freightOverride != null}
             onFreightChange={(v) => setFreightOverride(v)}
             onFreightReset={() => setFreightOverride(null)}
+            methodValue={effectiveMethod}
+            methodOverridden={methodNameOverride != null}
+            onMethodNameChange={(v) => setMethodNameOverride(v)}
+            onMethodNameReset={() => setMethodNameOverride(null)}
+            accountValue={effectiveAccount}
+            accountOverridden={accountOverride != null}
+            onAccountChange={(v) => setAccountOverride(v)}
+            onAccountReset={() => setAccountOverride(null)}
           />
           <OrderItemsTable
             lines={lines}

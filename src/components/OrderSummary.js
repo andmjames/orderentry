@@ -15,6 +15,8 @@ function Metric({ label, value, sub }) {
 export default function OrderSummary({
   totals, shipping, currency, methodOverride, onMethodChange,
   freightValue, freightCalculated, freightOverridden, onFreightChange, onFreightReset,
+  methodValue, methodOverridden, onMethodNameChange, onMethodNameReset,
+  accountValue, accountOverridden, onAccountChange, onAccountReset,
 }) {
   return (
     <div className="section">
@@ -76,25 +78,49 @@ export default function OrderSummary({
             </div>
           </div>
 
-          <Metric
-            label="Shipping Method"
-            value={shipping.shippingMethod}
-            sub={`(${shipping.methodType})`}
-          />
+          <div className="metric">
+            <div className="metric-label">Shipping Method</div>
+            <div className="metric-value">
+              <input
+                className="ot-edit"
+                type="text"
+                style={{ width: '100%', textAlign: 'left', fontSize: 15, fontWeight: 600, padding: '3px 6px' }}
+                value={methodValue}
+                onChange={e => onMethodNameChange(e.target.value)}
+              />
+            </div>
+            <div style={{ fontSize: 10.5, color: 'var(--text3)', marginTop: 3 }}>
+              ({shipping.methodType})
+              {methodOverridden && <> · manual ·{' '}
+                <span onClick={onMethodNameReset} style={{ color: 'var(--text2)', textDecoration: 'underline', cursor: 'pointer' }}>reset</span>
+              </>}
+            </div>
+          </div>
           <Metric
             label="Weight (lb)"
             value={shipping.weight.toLocaleString('en-US')}
             sub={shipping.palletWeight ? `(incl. ${shipping.palletWeight} lb pallets)` : ''}
           />
-          <Metric
-            label="Shipping Account"
-            value={shipping.freeFreight
-              ? <span style={{ color: 'var(--text3)', fontWeight: 500, fontSize: 13 }}>Not used (free freight)</span>
-              : (shipping.shippingAccount
-                ? shipping.shippingAccount
-                : <span style={{ color: 'var(--text3)', fontWeight: 500, fontSize: 13 }}>None on file</span>)}
-            sub={shipping.accountFromPo ? '(from PO)' : ''}
-          />
+          <div className="metric">
+            <div className="metric-label">Shipping Account</div>
+            <div className="metric-value">
+              <input
+                className="ot-edit"
+                type="text"
+                style={{ width: '100%', textAlign: 'left', fontSize: 15, fontWeight: 600, padding: '3px 6px' }}
+                value={accountValue}
+                placeholder={shipping.freeFreight ? 'Not used (free freight)' : (shipping.shippingAccount ? '' : 'None on file')}
+                onChange={e => onAccountChange(e.target.value)}
+              />
+            </div>
+            <div style={{ fontSize: 10.5, color: 'var(--text3)', marginTop: 3 }}>
+              {accountOverridden
+                ? <>manual · <span onClick={onAccountReset} style={{ color: 'var(--text2)', textDecoration: 'underline', cursor: 'pointer' }}>reset</span></>
+                : (shipping.freeFreight ? 'auto · free freight'
+                  : (shipping.accountFromPo ? 'auto · from PO'
+                    : (shipping.shippingAccount ? 'auto · on file' : 'auto')))}
+            </div>
+          </div>
         </div>
 
         <div style={{ marginTop: 10, fontSize: 11.5, color: 'var(--text3)', lineHeight: 1.6 }}>
