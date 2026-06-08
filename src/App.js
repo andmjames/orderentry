@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import PoUpload from './components/PoUpload';
 import OrderReview from './components/OrderReview';
 import SetupBanner from './components/SetupBanner';
@@ -12,12 +12,8 @@ export default function App() {
   const [customers, setCustomers] = useState([]);
   const [custLoading, setCustLoading] = useState(true);
   const [custError, setCustError] = useState(null);
-  const [order, setOrder] = useState(null); // { analysis, fileName }
-
-  // Ref to PoUpload's handleFile — populated via the onReady prop
-  const handleFileRef = useRef(null);
-  // Track whether we've already auto-triggered the po_file param
-  const autoTriggered = useRef(false);
+  const [order, setOrder] = useState(null);
+  const [autoFile, setAutoFile] = useState(null);
 
   useEffect(() => {
     fetchAllCustomers()
@@ -26,41 +22,26 @@ export default function App() {
       .finally(() => setCustLoading(false));
   }, []);
 
-  // Once customers are loaded AND PoUpload is ready AND we haven't triggered yet,
-  // check for ?po_file= in the URL and auto-process it
+  // Once customers are loaded, check for ?po_file= and fetch the file
   useEffect(() => {
-    if (custLoading) return;               // wait for customers first
-    if (autoTriggered.current) return;     // only run once
-    if (!handleFileRef.current) return;   // wait for PoUpload to mount
-
+    if (custLoading) return;
     const params = new URLSearchParams(window.location.search);
     const poFileUrl = params.get('po_file');
     if (!poFileUrl) return;
 
-    autoTriggered.current = true;
-
-    // Fetch the file from Supabase Storage and hand it to PoUpload
-    (async () => {
-      try {
-        const response = await fetch(poFileUrl);
-        if (!response.ok) throw new Error(`Could not fetch PO file (${response.status})`);
-
-        const blob = await response.blob();
-
-        // Derive a filename from the URL
+    fetch(poFileUrl)
+      .then(res => {
+        if (!res.ok) throw new Error('Could not fetch PO file');
+        return res.blob();
+      })
+      .then(blob => {
         const urlPath = new URL(poFileUrl).pathname;
-        const rawName = urlPath.split('/').pop() || 'purchase-order';
-        // URL-decode it (timestamps + underscores are fine; %20 etc. get cleaned up)
-        const fileName = decodeURIComponent(rawName);
-
+        const fileName = decodeURIComponent(urlPath.split('/').pop() || 'purchase-order');
         const file = new File([blob], fileName, { type: blob.type || 'application/octet-stream' });
-        handleFileRef.current(file);
-      } catch (err) {
-        console.error('Auto-load po_file failed:', err);
-        // Non-fatal — the upload UI is still visible so the user can upload manually
-      }
-    })();
-  }, [custLoading, custError]); // re-evaluate when customer load state changes
+        setAutoFile(file);
+      })
+      .catch(err => console.error('Auto-load po_file failed:', err));
+  }, [custLoading]);
 
   return (
     <ErrorBoundary>
@@ -83,7 +64,7 @@ export default function App() {
                 customersLoading={custLoading}
                 customersError={custError}
                 onAnalyzed={setOrder}
-                onReady={fn => { handleFileRef.current = fn; }}
+                autoFile={autoFile}
               />
             ) : (
               <OrderReview
