@@ -303,14 +303,14 @@ export default function PackingList({ data, onClose }) {
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
             <button className="btn btn-ghost btn-sm" onClick={onClose}>Close</button>
-            <button className="btn btn-primary" onClick={() => printWithPage('printing-packing', '@page { size: letter; margin: 0; }')}>
+            <button className="btn btn-primary" onClick={() => printWithPage('printing-packing', '@page { size: letter; margin: 0.5in; }')}>
               {data.canada ? 'Print (3 copies + USMCA)' : 'Print Packing List'}
             </button>
           </div>
         </div>
 
         {/* Screen preview — one packing list (+ one USMCA for Canada). Not printed. */}
-        <div className="packing-wrap no-print" style={{ padding: 18, background: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24 }}>
+        <div className="packing-preview no-print" style={{ padding: 18, background: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24 }}>
           <PackingDoc data={data} />
           {data.canada && <UsmcaDoc data={data} />}
         </div>

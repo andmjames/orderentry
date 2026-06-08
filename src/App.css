@@ -394,10 +394,9 @@ input[type=number] { -moz-appearance: textfield; appearance: textfield; }
     border-radius: 0 !important;
     background: #fff !important;
   }
-  html.printing-packing .packing-wrap { padding: 0 !important; display: block !important; }
   html.printing-packing .packing-list {
-    width: 8.5in !important;
-    padding: 0.5in !important;
+    width: 7.5in !important;
+    padding: 0 !important;
     box-sizing: border-box !important;
     box-shadow: none !important;
   }
@@ -406,8 +405,8 @@ input[type=number] { -moz-appearance: textfield; appearance: textfield; }
   html.printing-packing .pl-sheet { page-break-after: always; break-after: page; }
   html.printing-packing .pl-sheet:last-child { page-break-after: auto; break-after: auto; }
   html.printing-packing .usmca-page {
-    width: 8.5in !important;
-    padding: 0.5in !important;
+    width: 7.5in !important;
+    padding: 0 !important;
     box-sizing: border-box !important;
   }
 

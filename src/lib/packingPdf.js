@@ -158,7 +158,7 @@ export function buildPackingPdf(data) {
     const cwidth = right - M - 28;
     doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5);
     const certifyLines = doc.splitTextToSize(CUSTOMS_BOX.certify, cwidth);
-    const estH = 18 + 18 + certifyLines.length * 13 + 18 + 16 + 22 + 14;
+    const estH = 18 + 18 + certifyLines.length * 13 + 16 + 28 + 14 + 12;
     if (y + estH > 762) { doc.addPage(); y = M + 24; }
 
     const boxTop = y;
@@ -172,13 +172,14 @@ export function buildPackingPdf(data) {
     iy += 16;
     doc.setFontSize(11);
     doc.text('Made in the United States of America    ' + fmt(data.totals.cases) + '    Cases', innerX, iy);
-    iy += 18;
+    iy += 28;
     doc.text(fmt(data.totals.weight) + '    Lbs Total Weight', innerX, iy);
     try {
-      const sw = 96, sh = sw / (SIGNATURE_MARK_ASPECT || (397 / 128));
-      doc.addImage(SIGNATURE_MARK_SRC, 'PNG', innerX + 175, iy - sh + 6, sw, sh);
+      const sw = 84, sh = sw / (SIGNATURE_MARK_ASPECT || (397 / 128));
+      // Sit to the right of the weight text, with the image top below the line above.
+      doc.addImage(SIGNATURE_MARK_SRC, 'PNG', innerX + 215, iy - sh + 7, sw, sh);
     } catch (e) { /* ignore signature image errors */ }
-    iy += 12;
+    iy += 14;
     doc.setLineWidth(0.8);
     doc.rect(M, boxTop, right - M, iy - boxTop);
     y = iy;
