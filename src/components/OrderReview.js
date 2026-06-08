@@ -347,6 +347,7 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
           item_number: l.item_number, description: l.description,
         })),
         note: /ryonet/i.test(customer.name || '') ? '**Barcodes on all Rolls and Cartons**' : '',
+        nazdar: /nazdar/i.test(customer.name || ''),
       };
       setPackingData(packing);
 

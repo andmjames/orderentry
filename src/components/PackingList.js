@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom';
 import JsBarcode from 'jsbarcode';
 import { LOGO_SRC } from '../logo';
 import { printWithPage } from '../lib/printUtil';
+import { NAZDAR } from '../lib/nazdar';
 
 export default function PackingList({ data, onClose }) {
   const barcodeRef = useRef(null);
@@ -106,6 +107,55 @@ export default function PackingList({ data, onClose }) {
               <div style={{ border: '1px solid #000', padding: '14px 12px', textAlign: 'center', fontSize: 16, marginTop: 30 }}>
                 {data.note}
               </div>
+            )}
+
+            {data.nazdar && (
+              <>
+                {/* DO NOT STACK note */}
+                <div style={{ border: '1px solid #000', padding: '10px 12px', textAlign: 'center', marginTop: 26 }}>
+                  <span style={{ color: '#c00', fontWeight: 700, fontSize: 16 }}>*{NAZDAR.doNotStack}*</span>
+                </div>
+
+                {/* Barcodes applied + skid/lot lines + certificates + signature */}
+                <div style={{ border: '1px solid #000', padding: '12px 14px', marginTop: 10 }}>
+                  <div style={{ textAlign: 'center', color: '#c00', fontWeight: 700, fontSize: 15, marginBottom: 8 }}>
+                    {NAZDAR.barcodesTitle}
+                  </div>
+                  <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8 }}>{NAZDAR.lotNote}</div>
+                  <div style={{ fontSize: 11.5, lineHeight: 2.1, whiteSpace: 'pre' }}>
+                    {Array.from({ length: NAZDAR.skidRows }).map((_, i) => (
+                      <div key={i}>{NAZDAR.skidLine}</div>
+                    ))}
+                  </div>
+
+                  {/* Certificate of Origin */}
+                  <div style={{ marginTop: 16 }}>
+                    <div style={{ fontWeight: 700, fontSize: 12, textDecoration: 'underline' }}>{NAZDAR.originTitle}</div>
+                    <div style={{ fontSize: 8, lineHeight: 1.4, marginTop: 2 }}>{NAZDAR.originBody}</div>
+                    <div style={{ fontSize: 8, lineHeight: 1.4 }}>{NAZDAR.originLocation}</div>
+                  </div>
+
+                  {/* Certificate of Analysis */}
+                  <div style={{ marginTop: 12 }}>
+                    <div style={{ fontWeight: 700, fontSize: 12, textDecoration: 'underline' }}>{NAZDAR.analysisTitle}</div>
+                    <div style={{ fontSize: 8, lineHeight: 1.4, marginTop: 2 }}>{NAZDAR.analysisIntro}</div>
+                    <div style={{ fontSize: 7, lineHeight: 1.45, marginTop: 2, textAlign: 'justify' }}>{NAZDAR.analysisBody}</div>
+                  </div>
+
+                  {/* Authorized signature */}
+                  <div style={{ marginTop: 18, fontSize: 9 }}>
+                    <div>{NAZDAR.signLabel}</div>
+                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 14, marginTop: 14 }}>
+                      <div style={{ borderBottom: '1px solid #000', width: 150, height: 1 }} />
+                      <div style={{ lineHeight: 1.3 }}>
+                        <div>{NAZDAR.signName}</div>
+                        <div>{NAZDAR.signTitle}</div>
+                        <div>{NAZDAR.signCompany}</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </>
             )}
           </div>
         </div>

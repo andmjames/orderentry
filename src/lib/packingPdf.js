@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import JsBarcode from 'jsbarcode';
 import { LOGO_SRC } from '../logo';
+import { NAZDAR } from './nazdar';
 
 const fmt = (n) => Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
 
@@ -128,6 +129,89 @@ export function buildPackingPdf(data) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(13);
     doc.text(String(data.note), pageW / 2, y + boxH / 2 + 4, { align: 'center' });
+  }
+
+  // Nazdar-specific footer: notes, certificates, signature — Nazdar only.
+  if (data.nazdar) {
+    const innerX = M + 12;
+    const contentW = right - innerX - 12;
+
+    // Keep the whole block together: start a fresh page if it won't fit.
+    if (y > 330) { doc.addPage(); y = M + 8; } else { y += 18; }
+
+    // ── DO NOT STACK box ──
+    const dnsH = 26;
+    doc.setLineWidth(0.8);
+    doc.rect(M, y, right - M, dnsH);
+    doc.setTextColor(204, 0, 0);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.text(`*${NAZDAR.doNotStack}*`, pageW / 2, y + dnsH / 2 + 4, { align: 'center' });
+    doc.setTextColor(0, 0, 0);
+    y += dnsH + 8;
+
+    // ── Big box: barcodes applied + skid lines + certificates + signature ──
+    const boxTop = y;
+    let iy = y + 16;
+
+    doc.setTextColor(204, 0, 0);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(13);
+    doc.text(NAZDAR.barcodesTitle, pageW / 2, iy, { align: 'center' });
+    doc.setTextColor(0, 0, 0);
+    iy += 16;
+
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text(NAZDAR.lotNote, innerX, iy);
+    iy += 16;
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8.5);
+    for (let i = 0; i < NAZDAR.skidRows; i++) {
+      doc.text(NAZDAR.skidLine, innerX, iy);
+      iy += 15;
+    }
+
+    const underlinedTitle = (title) => {
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
+      doc.text(title, innerX, iy);
+      const w = doc.getTextWidth(title);
+      doc.setLineWidth(0.5);
+      doc.line(innerX, iy + 1.5, innerX + w, iy + 1.5);
+      iy += 11;
+    };
+
+    // Certificate of Origin
+    iy += 8;
+    underlinedTitle(NAZDAR.originTitle);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
+    doc.text(NAZDAR.originBody, innerX, iy); iy += 9;
+    doc.text(NAZDAR.originLocation, innerX, iy); iy += 14;
+
+    // Certificate of Analysis
+    underlinedTitle(NAZDAR.analysisTitle);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
+    doc.text(NAZDAR.analysisIntro, innerX, iy); iy += 10;
+    doc.setFontSize(6);
+    const analysisLines = doc.splitTextToSize(NAZDAR.analysisBody, contentW);
+    doc.text(analysisLines, innerX, iy);
+    iy += analysisLines.length * 7.3 + 12;
+
+    // Authorized signature
+    doc.setFontSize(8.5);
+    doc.text(NAZDAR.signLabel, innerX, iy);
+    iy += 26;
+    doc.setLineWidth(0.6);
+    doc.line(innerX, iy, innerX + 150, iy);
+    doc.text(NAZDAR.signName, innerX + 162, iy - 11);
+    doc.text(NAZDAR.signTitle, innerX + 162, iy - 2);
+    doc.text(NAZDAR.signCompany, innerX + 162, iy + 7);
+    iy += 14;
+
+    // Border around the section.
+    doc.setLineWidth(0.8);
+    doc.rect(M, boxTop, right - M, iy - boxTop);
   }
 
   return doc.output('datauristring').split(',')[1];
