@@ -16,8 +16,8 @@ export default class ErrorBoundary extends React.Component {
           </pre>
           <div style={{ background: '#f7f7f5', border: '.5px solid rgba(0,0,0,.12)', borderRadius: 8, padding: '12px 14px', fontSize: 12, color: '#6b6b6b', lineHeight: 1.8, marginBottom: 16 }}>
             <strong style={{ color: '#1a1a1a' }}>Required env vars:</strong><br/>
-            ZOHO_CLIENT_ID · ZOHO_CLIENT_SECRET · ZOHO_ORGANIZATION_ID<br/>
-            (plus ZOHO_REFRESH_TOKEN <em>or</em> client-credentials scope)
+            REACT_APP_SUPABASE_URL · REACT_APP_SUPABASE_ANON_KEY<br/>
+            ZOHO_CLIENT_ID · ZOHO_CLIENT_SECRET · ZOHO_REFRESH_TOKEN · ZOHO_ORGANIZATION_ID
           </div>
           <button onClick={() => window.location.reload()} style={{ background: '#1a1a1a', color: '#fff', border: 'none', borderRadius: 8, padding: '9px 18px', cursor: 'pointer', fontSize: 14, fontFamily: 'inherit', fontWeight: 500 }}>Reload</button>
         </div>
