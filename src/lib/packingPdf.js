@@ -3,6 +3,8 @@ import JsBarcode from 'jsbarcode';
 import { LOGO_SRC } from '../logo';
 import { NAZDAR, IMAGE_TECH } from './nazdar';
 import { SIGNATURE_SRC, SIGNATURE_ASPECT } from '../signature';
+import { SIGNATURE_MARK_SRC, SIGNATURE_MARK_ASPECT } from '../signatureMark';
+import { CUSTOMS_BOX, USMCA, PMI_PARTY, blanketPeriod, todayMDY } from './canada';
 
 const fmt = (n) => Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
 
@@ -149,6 +151,39 @@ export function buildPackingPdf(data) {
     y += boxH;
   }
 
+  // Canada customs box — orders shipping to Canada.
+  if (data.canada) {
+    y += 24;
+    const innerX = M + 14;
+    const cwidth = right - M - 28;
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(9.5);
+    const certifyLines = doc.splitTextToSize(CUSTOMS_BOX.certify, cwidth);
+    const estH = 18 + 18 + certifyLines.length * 13 + 18 + 16 + 22 + 14;
+    if (y + estH > 762) { doc.addPage(); y = M + 24; }
+
+    const boxTop = y;
+    let iy = y + 18;
+    doc.setTextColor(0, 0, 0);
+    doc.setFont('helvetica', 'normal'); doc.setFontSize(11);
+    doc.text(CUSTOMS_BOX.doNotRemove, pageW / 2, iy, { align: 'center' });
+    iy += 18;
+    doc.setFontSize(9.5);
+    certifyLines.forEach(ln => { doc.text(ln, pageW / 2, iy, { align: 'center' }); iy += 13; });
+    iy += 16;
+    doc.setFontSize(11);
+    doc.text('Made in the United States of America    ' + fmt(data.totals.cases) + '    Cases', innerX, iy);
+    iy += 18;
+    doc.text(fmt(data.totals.weight) + '    Lbs Total Weight', innerX, iy);
+    try {
+      const sw = 96, sh = sw / (SIGNATURE_MARK_ASPECT || (397 / 128));
+      doc.addImage(SIGNATURE_MARK_SRC, 'PNG', innerX + 175, iy - sh + 6, sw, sh);
+    } catch (e) { /* ignore signature image errors */ }
+    iy += 12;
+    doc.setLineWidth(0.8);
+    doc.rect(M, boxTop, right - M, iy - boxTop);
+    y = iy;
+  }
+
   // Nazdar-specific footer: notes, certificates, signature — Nazdar only.
   // Keep the whole block together: if it won't fit on the current page, move it
   // wholesale to a new page (never split the Nazdar note across pages).
@@ -239,5 +274,165 @@ export function buildPackingPdf(data) {
     doc.rect(M, boxTop, right - M, iy - boxTop);
   }
 
+  // Canada: append a USMCA Certificate of Origin page.
+  if (data.canada) {
+    doc.addPage();
+    buildUsmcaPage(doc, data);
+  }
+
   return doc.output('datauristring').split(',')[1];
+}
+
+// One party cell (label + address lines); returns the bottom y used.
+function usmcaPartyCell(doc, x, y, label, lines) {
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(8);
+  doc.text(label, x + 4, y + 11);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
+  let ty = y + 22;
+  (lines || []).forEach(ln => { doc.text(String(ln), x + 4, ty); ty += 9.5; });
+  return ty;
+}
+
+// Draw a full USMCA Certificate of Origin on the current page.
+function buildUsmcaPage(doc, data) {
+  const pageW = 612, M = 36, right = 576, width = right - M, mid = M + width / 2;
+  const bp = blanketPeriod();
+  const today = todayMDY();
+  const items = data.usmcaItems || [];
+
+  doc.setTextColor(0, 0, 0);
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(10);
+  let y = M + 6;
+  doc.splitTextToSize(USMCA.title1, width).forEach(ln => { doc.text(ln, pageW / 2, y, { align: 'center' }); y += 13; });
+  doc.text(USMCA.title2, pageW / 2, y, { align: 'center' }); y += 16;
+
+  const formTop = y;
+  doc.setLineWidth(0.6);
+
+  // Row 1: Blanket period | Single shipment
+  let rowTop = y;
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5);
+  doc.text('Blanket Period: (MM/DD/YYYY)', M + 4, rowTop + 11);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+  doc.text('From:     ' + bp.from, M + 4, rowTop + 26);
+  doc.text('To:          ' + bp.to, M + 4, rowTop + 37);
+  doc.text('Single Shipment:    ' + USMCA.singleShipment, mid + 4, rowTop + 11);
+  doc.text('Invoice Number:    ' + String(data.invoiceNumber || ''), mid + 4, rowTop + 24);
+  let rowBot = rowTop + 46;
+  doc.line(M, rowBot, right, rowBot);
+  doc.line(mid, rowTop, mid, rowBot);
+  y = rowBot;
+
+  // Row 2: Certifier | Exporter
+  rowTop = y;
+  const b1 = usmcaPartyCell(doc, M, rowTop, "Certifier's Name and Address:", PMI_PARTY);
+  const b2 = usmcaPartyCell(doc, mid, rowTop, "Exporter's Name and Address:", PMI_PARTY);
+  rowBot = Math.max(b1, b2) + 4;
+  doc.line(M, rowBot, right, rowBot);
+  doc.line(mid, rowTop, mid, rowBot);
+  y = rowBot;
+
+  // Row 3: Producer | Importer
+  rowTop = y;
+  const b3 = usmcaPartyCell(doc, M, rowTop, "Producer's Name and Address", PMI_PARTY);
+  const b4 = usmcaPartyCell(doc, mid, rowTop, "Importer's Name and Address:", data.importerLines || []);
+  rowBot = Math.max(b3, b4) + 4;
+  doc.line(M, rowBot, right, rowBot);
+  doc.line(mid, rowTop, mid, rowBot);
+  y = rowBot;
+
+  // Goods table
+  const colX = [M, M + width * 0.30, M + width * 0.42, M + width * 0.54, M + width * 0.66, M + width * 0.75, M + width * 0.86, right];
+  const headers = ['Part Number/Description of Good(s)', 'Tariff Number', 'Origin Criterion', 'Qualification Method', 'Country of Origin', 'Accumulation Value (USD)', 'Labor Value Content Requirement'];
+  const headTop = y;
+  const headH = 36;
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(6.5);
+  for (let i = 0; i < 7; i++) {
+    const cx = colX[i], cw = colX[i + 1] - colX[i];
+    let hy = headTop + 9;
+    doc.splitTextToSize(headers[i], cw - 4).forEach(ln => { doc.text(ln, cx + cw / 2, hy, { align: 'center' }); hy += 7; });
+  }
+  let ty = headTop + headH;
+  doc.line(M, ty, right, ty);
+
+  const rowH = 16;
+  const totalRows = Math.max(8, items.length);
+  doc.setFont('helvetica', 'normal');
+  for (let r = 0; r < totalRows; r++) {
+    const it = items[r];
+    if (!it) continue;
+    const cy = ty + r * rowH + 11;
+    doc.setFontSize(6.5);
+    doc.text(doc.splitTextToSize(String(it.description || it.item_number || ''), colX[1] - colX[0] - 6), colX[0] + 3, ty + r * rowH + 9);
+    doc.setFontSize(7.5);
+    doc.text(USMCA.tariff, (colX[1] + colX[2]) / 2, cy, { align: 'center' });
+    doc.text(USMCA.originCriterion, (colX[2] + colX[3]) / 2, cy, { align: 'center' });
+    doc.text(USMCA.countryOfOrigin, (colX[4] + colX[5]) / 2, cy, { align: 'center' });
+    doc.text(USMCA.accumulation, (colX[5] + colX[6]) / 2, cy, { align: 'center' });
+    doc.text(USMCA.laborValue, (colX[6] + colX[7]) / 2, cy, { align: 'center' });
+  }
+  const tableBot = ty + totalRows * rowH;
+  for (let i = 0; i < colX.length; i++) doc.line(colX[i], headTop, colX[i], tableBot);
+  doc.line(M, tableBot, right, tableBot);
+  y = tableBot;
+
+  // Certification statements
+  let cy2 = y + 11;
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
+  doc.text(USMCA.certifyTitle, M + 4, cy2); cy2 += 9;
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(6.5);
+  USMCA.certifyText.forEach(t => {
+    const lines = doc.splitTextToSize('* ' + t, width - 8);
+    doc.text(lines, M + 4, cy2);
+    cy2 += lines.length * 7.5 + 1;
+  });
+  cy2 += 4;
+  doc.line(M, cy2, right, cy2);
+  y = cy2;
+
+  // Signature | Company
+  let sTop = y;
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5);
+  doc.text('AUTHORIZED SIGNATURE:', M + 4, sTop + 13);
+  try {
+    const sw = 90, sh = sw / (SIGNATURE_MARK_ASPECT || (397 / 128));
+    doc.addImage(SIGNATURE_MARK_SRC, 'PNG', M + 140, sTop + 4, sw, sh);
+  } catch (e) { /* ignore */ }
+  doc.text('COMPANY', mid + 4, sTop + 11);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+  doc.text(USMCA.company, mid + width / 4, sTop + 26, { align: 'center' });
+  let sBot = sTop + 38;
+  doc.line(M, sBot, right, sBot); doc.line(mid, sTop, mid, sBot);
+  y = sBot;
+
+  // Name | Title
+  let nTop = y;
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5);
+  doc.text('NAME', M + 4, nTop + 11);
+  doc.text('TITLE', mid + 4, nTop + 11);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+  doc.text(USMCA.name, M + 4, nTop + 24);
+  doc.text(USMCA.titleField, mid + 4, nTop + 24);
+  let nBot = nTop + 30;
+  doc.line(M, nBot, right, nBot); doc.line(mid, nTop, mid, nBot);
+  y = nBot;
+
+  // Date | Telephone | Fax
+  let dTop = y;
+  const c2 = M + width * 0.22, c3 = M + width * 0.61;
+  doc.setFont('helvetica', 'bold'); doc.setFontSize(8.5);
+  doc.text('DATE', M + 4, dTop + 11);
+  doc.text('TELEPHONE', c2 + 4, dTop + 11);
+  doc.text('FAX', c3 + 4, dTop + 11);
+  doc.setFont('helvetica', 'normal'); doc.setFontSize(8.5);
+  doc.text(today, M + 4, dTop + 24);
+  doc.text(USMCA.telephone, c2 + 4, dTop + 24);
+  doc.text(USMCA.fax, c3 + 4, dTop + 24);
+  let dBot = dTop + 30;
+  doc.line(c2, dTop, c2, dBot); doc.line(c3, dTop, c3, dBot);
+  y = dBot;
+
+  // Outer border
+  doc.setLineWidth(0.8);
+  doc.rect(M, formTop, width, y - formTop);
 }

@@ -336,6 +336,17 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
 
       const res = await createSalesOrder(payload);
       setResult(res);
+      // De-duplicate SKUs for the USMCA certificate (one row per unique item).
+      const usmcaSeen = new Set();
+      const usmcaItems = [];
+      sendable.forEach(l => {
+        if (!usmcaSeen.has(l.item_number)) {
+          usmcaSeen.add(l.item_number);
+          usmcaItems.push({ item_number: l.item_number, description: l.description || '' });
+        }
+      });
+      const shipCountry = String(selectedAddr?.addr?.country || '').trim();
+      const shipsToCanada = /canada/i.test(shipCountry) || /^ca$/i.test(shipCountry);
       const packing = {
         customerName: customer.name,
         shipTo: selectedAddr?.addr ? formatAddress(selectedAddr.addr) : '',
@@ -349,6 +360,9 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
         note: /ryonet/i.test(customer.name || '') ? '**Barcodes on all Rolls and Cartons**' : '',
         nazdar: /nazdar/i.test(customer.name || ''),
         imageTech: /image\s*tech/i.test(customer.name || ''),
+        canada: shipsToCanada,
+        importerLines: shipToLines(selectedAddr?.addr, customer.name),
+        usmcaItems,
       };
       setPackingData(packing);
 

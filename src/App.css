@@ -368,6 +368,8 @@ input[type=number] { -moz-appearance: textfield; appearance: textfield; }
 .excluded-row td { color: var(--warn); font-size: 12px; }
 
 /* ─── Print (packing list = Letter, pallet labels = 6x4) ──────────── */
+/* The multi-copy print block is hidden on screen; the print stylesheet reveals it. */
+.packing-print { display: none; }
 @media print {
   #root { display: none !important; }
   .no-print { display: none !important; }
@@ -398,6 +400,15 @@ input[type=number] { -moz-appearance: textfield; appearance: textfield; }
     padding: 0.5in !important;
     box-sizing: border-box !important;
     box-shadow: none !important;
+  }
+  /* Multi-copy print output: reveal it and break each sheet onto its own page. */
+  html.printing-packing .packing-print { display: block !important; }
+  html.printing-packing .pl-sheet { page-break-after: always; break-after: page; }
+  html.printing-packing .pl-sheet:last-child { page-break-after: auto; break-after: auto; }
+  html.printing-packing .usmca-page {
+    width: 8.5in !important;
+    padding: 0.5in !important;
+    box-sizing: border-box !important;
   }
 
   /* Pallet labels — one 6x4 page per label */
