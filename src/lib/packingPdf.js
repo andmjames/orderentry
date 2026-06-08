@@ -2,6 +2,7 @@ import { jsPDF } from 'jspdf';
 import JsBarcode from 'jsbarcode';
 import { LOGO_SRC } from '../logo';
 import { NAZDAR } from './nazdar';
+import { SIGNATURE_SRC, SIGNATURE_ASPECT } from '../signature';
 
 const fmt = (n) => Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
 
@@ -132,15 +133,27 @@ export function buildPackingPdf(data) {
   }
 
   // Nazdar-specific footer: notes, certificates, signature — Nazdar only.
+  // Keep the whole block together: if it won't fit on the current page, move it
+  // wholesale to a new page (never split the Nazdar note across pages).
   if (data.nazdar) {
     const innerX = M + 12;
     const contentW = right - innerX - 12;
 
-    // Keep the whole block together: start a fresh page if it won't fit.
-    if (y > 330) { doc.addPage(); y = M + 8; } else { y += 18; }
+    // Pre-measure the variable-height pieces so we can decide on a page break.
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(6);
+    const analysisLines = doc.splitTextToSize(NAZDAR.analysisBody, contentW);
+
+    const sigW = 260;
+    const sigH = sigW / (SIGNATURE_ASPECT || (1028 / 288));
+
+    const dnsH = 26;
+    const bigBoxH = 259 + analysisLines.length * 7.3 + sigH;
+    const blockH = (dnsH + 8) + bigBoxH;
+    const pageBottom = 762;
+    if (y + 18 + blockH > pageBottom) { doc.addPage(); y = M + 8; } else { y += 18; }
 
     // ── DO NOT STACK box ──
-    const dnsH = 26;
     doc.setLineWidth(0.8);
     doc.rect(M, y, right - M, dnsH);
     doc.setTextColor(204, 0, 0);
@@ -194,20 +207,15 @@ export function buildPackingPdf(data) {
     doc.setFont('helvetica', 'normal'); doc.setFontSize(7);
     doc.text(NAZDAR.analysisIntro, innerX, iy); iy += 10;
     doc.setFontSize(6);
-    const analysisLines = doc.splitTextToSize(NAZDAR.analysisBody, contentW);
     doc.text(analysisLines, innerX, iy);
     iy += analysisLines.length * 7.3 + 12;
 
-    // Authorized signature
-    doc.setFontSize(8.5);
-    doc.text(NAZDAR.signLabel, innerX, iy);
-    iy += 26;
-    doc.setLineWidth(0.6);
-    doc.line(innerX, iy, innerX + 150, iy);
-    doc.text(NAZDAR.signName, innerX + 162, iy - 11);
-    doc.text(NAZDAR.signTitle, innerX + 162, iy - 2);
-    doc.text(NAZDAR.signCompany, innerX + 162, iy + 7);
-    iy += 14;
+    // Authorized signature image (label + handwritten signature + name/title)
+    iy += 10;
+    try {
+      doc.addImage(SIGNATURE_SRC, 'PNG', innerX, iy, sigW, sigH);
+    } catch (e) { /* ignore signature image errors */ }
+    iy += sigH + 6;
 
     // Border around the section.
     doc.setLineWidth(0.8);

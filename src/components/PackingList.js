@@ -4,6 +4,7 @@ import JsBarcode from 'jsbarcode';
 import { LOGO_SRC } from '../logo';
 import { printWithPage } from '../lib/printUtil';
 import { NAZDAR } from '../lib/nazdar';
+import { SIGNATURE_SRC } from '../signature';
 
 export default function PackingList({ data, onClose }) {
   const barcodeRef = useRef(null);
@@ -110,9 +111,9 @@ export default function PackingList({ data, onClose }) {
             )}
 
             {data.nazdar && (
-              <>
+              <div style={{ breakInside: 'avoid', pageBreakInside: 'avoid', marginTop: 26 }}>
                 {/* DO NOT STACK note */}
-                <div style={{ border: '1px solid #000', padding: '10px 12px', textAlign: 'center', marginTop: 26 }}>
+                <div style={{ border: '1px solid #000', padding: '10px 12px', textAlign: 'center' }}>
                   <span style={{ color: '#c00', fontWeight: 700, fontSize: 16 }}>*{NAZDAR.doNotStack}*</span>
                 </div>
 
@@ -142,20 +143,12 @@ export default function PackingList({ data, onClose }) {
                     <div style={{ fontSize: 7, lineHeight: 1.45, marginTop: 2, textAlign: 'justify' }}>{NAZDAR.analysisBody}</div>
                   </div>
 
-                  {/* Authorized signature */}
-                  <div style={{ marginTop: 18, fontSize: 9 }}>
-                    <div>{NAZDAR.signLabel}</div>
-                    <div style={{ display: 'flex', alignItems: 'flex-end', gap: 14, marginTop: 14 }}>
-                      <div style={{ borderBottom: '1px solid #000', width: 150, height: 1 }} />
-                      <div style={{ lineHeight: 1.3 }}>
-                        <div>{NAZDAR.signName}</div>
-                        <div>{NAZDAR.signTitle}</div>
-                        <div>{NAZDAR.signCompany}</div>
-                      </div>
-                    </div>
+                  {/* Authorized signature (image: label + handwritten signature + name) */}
+                  <div style={{ marginTop: 16 }}>
+                    <img src={SIGNATURE_SRC} alt="Authorized Signature — Andrew James, President, PMI Tape" style={{ width: '3.6in', height: 'auto', display: 'block' }} />
                   </div>
                 </div>
-              </>
+              </div>
             )}
           </div>
         </div>
