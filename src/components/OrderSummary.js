@@ -79,9 +79,11 @@ export default function OrderSummary({
           />
           <Metric
             label="Shipping Account"
-            value={shipping.shippingAccount
-              ? shipping.shippingAccount
-              : <span style={{ color: 'var(--text3)', fontWeight: 500, fontSize: 13 }}>None on file</span>}
+            value={shipping.freeFreight
+              ? <span style={{ color: 'var(--text3)', fontWeight: 500, fontSize: 13 }}>Not used (free freight)</span>
+              : (shipping.shippingAccount
+                ? shipping.shippingAccount
+                : <span style={{ color: 'var(--text3)', fontWeight: 500, fontSize: 13 }}>None on file</span>)}
             sub={shipping.accountFromPo ? '(from PO)' : ''}
           />
         </div>

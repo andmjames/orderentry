@@ -223,23 +223,38 @@ export function computeShipping(customer, totals, methodOverride, poAccounts) {
     : (c.parcelAccountNumber || '');
   const poAccount = String((methodType === 'freight' ? po.freight : po.parcel) || '').trim();
   const norm = s => String(s || '').toLowerCase().replace(/\s/g, '');
-  const accountFromPo = !!poAccount && norm(poAccount) !== norm(onFileAccount);
-  const account = poAccount || onFileAccount;
-  const hasAccount = !!String(account).trim();
 
-  // Charge rules:
-  //  - account on file (for the chosen method) → 0.00
-  //  - freight, no freight account → weight × Freight $/LB
-  //  - parcel,  no parcel account  → weight × Parcel $/LB
-  let freightCharge, chargeBasis;
-  if (hasAccount) {
+  // Free-freight threshold: if the order's case count meets/exceeds the customer's
+  // "Free Freight (Cases)" value, PMI prepays freight — charge $0 and use NO account.
+  const freeFreightCases = num(c.casesForFreeFreight, 0);
+  const qualifiesFreeFreight = freeFreightCases > 0 && (totals.cases || 0) >= freeFreightCases;
+
+  let account, hasAccount, accountFromPo, freightCharge, chargeBasis;
+
+  if (qualifiesFreeFreight) {
+    account = '';
+    hasAccount = false;
+    accountFromPo = false;
     freightCharge = 0;
-    chargeBasis = `Billed to ${methodType} account ${accountFromPo ? 'from PO' : 'on file'}`;
+    chargeBasis = `Free freight — order is ${totals.cases} cases (≥ ${freeFreightCases})`;
   } else {
-    const perLb = methodType === 'freight' ? freightPerLb : parcelPerLb;
-    const label = methodType === 'freight' ? 'Freight $/LB' : 'Parcel $/LB';
-    freightCharge = weight * perLb;
-    chargeBasis = `${weight} lb × ${currencySymbol(c.currencyCode || 'USD')}${perLb}/lb (${label})`;
+    accountFromPo = !!poAccount && norm(poAccount) !== norm(onFileAccount);
+    account = poAccount || onFileAccount;
+    hasAccount = !!String(account).trim();
+
+    // Charge rules:
+    //  - account on file (for the chosen method) → 0.00
+    //  - freight, no freight account → weight × Freight $/LB
+    //  - parcel,  no parcel account  → weight × Parcel $/LB
+    if (hasAccount) {
+      freightCharge = 0;
+      chargeBasis = `Billed to ${methodType} account ${accountFromPo ? 'from PO' : 'on file'}`;
+    } else {
+      const perLb = methodType === 'freight' ? freightPerLb : parcelPerLb;
+      const label = methodType === 'freight' ? 'Freight $/LB' : 'Parcel $/LB';
+      freightCharge = weight * perLb;
+      chargeBasis = `${weight} lb × ${currencySymbol(c.currencyCode || 'USD')}${perLb}/lb (${label})`;
+    }
   }
   freightCharge = Math.round(freightCharge * 100) / 100;
 
@@ -249,6 +264,7 @@ export function computeShipping(customer, totals, methodOverride, poAccounts) {
 
   return {
     methodType, shippingMethod, shippingAccount: account, hasAccount, accountFromPo,
+    freeFreight: qualifiesFreeFreight,
     pallets, baseWeight: Math.round(baseWeight * 100) / 100, palletWeight,
     weight, freightCharge, chargeBasis,
   };
