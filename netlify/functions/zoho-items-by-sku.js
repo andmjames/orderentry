@@ -42,6 +42,16 @@ async function fetchOne(sku) {
     return null;
   };
 
+  // "Available for Sale" as shown in Zoho = stock on hand − committed stock.
+  // Compute it directly so committed (already-promised) quantity is reflected
+  // and can go negative; fall back to Zoho's available_stock fields if the
+  // components aren't both returned.
+  const onHand    = stockField('stock_on_hand');
+  const committed = stockField('committed_stock', 'actual_committed_stock');
+  const availableForSale = (onHand != null && committed != null)
+    ? onHand - committed
+    : stockField('available_stock', 'actual_available_stock', 'stock_on_hand');
+
   return {
     sku:            item.sku || sku,
     id:             item.item_id,
@@ -51,7 +61,7 @@ async function fetchOne(sku) {
     unitsPerCase:   cf('Units per Case', 'Units per Carton', 'Units/Case', 'Units/Carton'),
     weightPerCase:  cf('Weight per Case (LBS)', 'Weight Per Case (LBS)', 'Weight per Case', 'Weight Per Carton (LBS)'),
     casesPerPallet: cf('Cases per Pallet', 'Cartons per Pallet', 'Cases/Pallet', 'Cartons/Pallet'),
-    availableStock: stockField('available_stock', 'actual_available_stock', 'stock_on_hand'),
+    availableStock: availableForSale,
   };
 }
 

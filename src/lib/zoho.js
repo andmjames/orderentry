@@ -26,6 +26,14 @@ export async function fetchCustomer(customerId) {
   return apiFetch(`/zoho-customer?id=${encodeURIComponent(customerId)}`);
 }
 
+// Adds a new shipping address to the customer's contact record in Zoho.
+export async function addCustomerAddress(customerId, address) {
+  return apiFetch('/zoho-add-address', {
+    method: 'POST',
+    body: JSON.stringify({ customer_id: customerId, address }),
+  });
+}
+
 // ── Items ────────────────────────────────────────────────────────────────────
 export async function fetchItemDetailsBySku(skus) {
   if (!skus || !skus.length) return [];

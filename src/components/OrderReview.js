@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { fetchCustomer, fetchItemDetailsBySku, matchOrder, createSalesOrder, checkDuplicatePo, attachSalesOrderPdf, attachSalesOrderFile } from '../lib/zoho';
+import { fetchCustomer, fetchItemDetailsBySku, matchOrder, createSalesOrder, checkDuplicatePo, attachSalesOrderPdf, attachSalesOrderFile, addCustomerAddress } from '../lib/zoho';
 import { fetchCustomerPricing } from '../lib/supabase';
 import { buildPackingPdf } from '../lib/packingPdf';
 import { buildPalletLabelsPdf } from '../lib/palletPdf';
@@ -90,6 +90,10 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
   const [addresses, setAddresses] = useState([]);
   const [selectedAddrId, setSelectedAddrId] = useState('');
   const [addrMatched, setAddrMatched] = useState(null); // true=matched existing, false=added new
+  const [showAddAddr, setShowAddAddr] = useState(false);
+  const [addingAddr, setAddingAddr] = useState(false);
+  const emptyAddr = { attention: '', address: '', street2: '', city: '', state: '', zip: '', country: 'USA' };
+  const [newAddr, setNewAddr] = useState(emptyAddr);
   const [lines, setLines] = useState([]);
   const [pricingMap, setPricingMap] = useState(new Map());
   const [itemDetails, setItemDetails] = useState([]);
@@ -289,6 +293,47 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
       return applyOrderTierPricing([...prev, repriceLine(base, { qty: q })], pricingMap);
     });
     setApproved(false);
+  }
+
+  // Save a brand-new shipping address to the customer's Zoho contact, then
+  // add it to the dropdown and select it for this order.
+  async function saveNewAddress() {
+    if (!customer) return;
+    const addr = {
+      attention: (newAddr.attention || '').trim(),
+      address:   (newAddr.address || '').trim(),
+      street2:   (newAddr.street2 || '').trim(),
+      city:      (newAddr.city || '').trim(),
+      state:     (newAddr.state || '').trim(),
+      zip:       (newAddr.zip || '').trim(),
+      country:   (newAddr.country || 'USA').trim(),
+    };
+    if (!addr.address && !addr.city) {
+      toast('Enter at least a street and city', 'error');
+      return;
+    }
+    setAddingAddr(true);
+    try {
+      const res = await addCustomerAddress(customer.id, addr);
+      const id = res.address_id || `added-${Date.now()}`;
+      const opt = {
+        id,
+        label: formatAddress(addr),
+        addr: { ...addr, address_id: res.address_id || undefined },
+        isNew: false,
+      };
+      setAddresses(prev => [...prev, opt]);
+      setSelectedAddrId(id);
+      setAddrMatched(null);
+      setShowAddAddr(false);
+      setNewAddr(emptyAddr);
+      setApproved(false);
+      toast('Shipping address added to Zoho');
+    } catch (e) {
+      toast(`Could not add address: ${e.message}`, 'error');
+    } finally {
+      setAddingAddr(false);
+    }
   }
 
   function openPricingApp() {
@@ -532,10 +577,20 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
 
           {customer && (
             <div className="field-group" style={{ marginTop: 12 }}>
-              <label className="field-label">
-                Shipping Address
-                {addrMatched === true && <span className="badge badge-green" style={{ marginLeft: 8 }}>matched from PO</span>}
-                {addrMatched === false && <span className="badge badge-blue" style={{ marginLeft: 8 }}>new — added from PO</span>}
+              <label className="field-label" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <span>
+                  Shipping Address
+                  {addrMatched === true && <span className="badge badge-green" style={{ marginLeft: 8 }}>matched from PO</span>}
+                  {addrMatched === false && <span className="badge badge-blue" style={{ marginLeft: 8 }}>new — added from PO</span>}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={() => setShowAddAddr(v => !v)}
+                  style={{ flexShrink: 0 }}
+                >
+                  + Add new Shipping Address
+                </button>
               </label>
               <select
                 className="field-input"
@@ -549,6 +604,27 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
                   </option>
                 ))}
               </select>
+
+              {showAddAddr && (
+                <div style={{ marginTop: 10, border: '.5px solid var(--border)', borderRadius: 'var(--radius)', padding: 14, background: 'var(--bg)' }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>New Shipping Address</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10 }}>
+                    <input className="field-input" style={{ gridColumn: '1 / -1' }} placeholder="Attention / Company" value={newAddr.attention} onChange={e => setNewAddr({ ...newAddr, attention: e.target.value })} />
+                    <input className="field-input" style={{ gridColumn: '1 / -1' }} placeholder="Street address" value={newAddr.address} onChange={e => setNewAddr({ ...newAddr, address: e.target.value })} />
+                    <input className="field-input" style={{ gridColumn: '1 / -1' }} placeholder="Street line 2 (optional)" value={newAddr.street2} onChange={e => setNewAddr({ ...newAddr, street2: e.target.value })} />
+                    <input className="field-input" placeholder="City" value={newAddr.city} onChange={e => setNewAddr({ ...newAddr, city: e.target.value })} />
+                    <input className="field-input" placeholder="State" value={newAddr.state} onChange={e => setNewAddr({ ...newAddr, state: e.target.value })} />
+                    <input className="field-input" placeholder="ZIP" value={newAddr.zip} onChange={e => setNewAddr({ ...newAddr, zip: e.target.value })} />
+                    <input className="field-input" placeholder="Country" value={newAddr.country} onChange={e => setNewAddr({ ...newAddr, country: e.target.value })} />
+                  </div>
+                  <div style={{ display: 'flex', gap: 10, marginTop: 12, justifyContent: 'flex-end' }}>
+                    <button type="button" className="btn btn-ghost btn-sm" disabled={addingAddr} onClick={() => { setShowAddAddr(false); setNewAddr(emptyAddr); }}>Cancel</button>
+                    <button type="button" className="btn btn-primary btn-sm" disabled={addingAddr || (!newAddr.address && !newAddr.city)} onClick={saveNewAddress}>
+                      {addingAddr ? 'Saving…' : 'Save to Zoho & use'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </div>
