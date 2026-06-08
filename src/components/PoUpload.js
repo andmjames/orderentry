@@ -12,7 +12,7 @@ function fileToBase64(file) {
 
 const ACCEPT = '.pdf,image/png,image/jpeg,image/webp,image/gif,application/pdf';
 
-export default function PoUpload({ customers, customersLoading, customersError, onAnalyzed, onReady }) {
+export default function PoUpload({ customers, customersLoading, customersError, onAnalyzed, autoFile }) {
   const [drag, setDrag] = useState(false);
   const [busy, setBusy] = useState(false);
   const [stage, setStage] = useState('');
@@ -27,8 +27,6 @@ export default function PoUpload({ customers, customersLoading, customersError, 
 
     const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
     const isImg = /^image\//.test(file.type) || /\.(png|jpe?g|webp|gif)$/i.test(file.name);
-
-    // .txt files (email body captures) are also valid — treat as plain text PO
     const isTxt = file.type === 'text/plain' || /\.txt$/i.test(file.name);
 
     if (!isPdf && !isImg && !isTxt) {
@@ -37,15 +35,11 @@ export default function PoUpload({ customers, customersLoading, customersError, 
     }
 
     setBusy(true);
-    setStage('Reading file…');
+    setStage('Reading file\u2026');
     try {
       const fileBase64 = await fileToBase64(file);
-      const mediaType = isPdf
-        ? 'application/pdf'
-        : isTxt
-          ? 'text/plain'
-          : (file.type || 'image/png');
-      setStage('Analyzing purchase order with Claude…');
+      const mediaType = isPdf ? 'application/pdf' : isTxt ? 'text/plain' : (file.type || 'image/png');
+      setStage('Analyzing purchase order with Claude\u2026');
       const analysis = await analyzePo({ fileBase64, mediaType, customers });
       onAnalyzed({ analysis, fileName: file.name });
     } catch (e) {
@@ -56,11 +50,13 @@ export default function PoUpload({ customers, customersLoading, customersError, 
     }
   }
 
-  // Expose handleFile to parent (App.js) so it can trigger auto-load from ?po_file=
+  // Auto-trigger when a file is passed in via the autoFile prop
   useEffect(() => {
-    if (onReady) onReady(handleFile);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [customers]); // re-expose when customers list updates so analyzePo gets fresh data
+    if (autoFile && !busy) {
+      handleFile(autoFile);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoFile]);
 
   function onDrop(e) {
     e.preventDefault();
@@ -107,7 +103,7 @@ export default function PoUpload({ customers, customersLoading, customersError, 
                   <path d="M4 16v2.5A1.5 1.5 0 0 0 5.5 20h13a1.5 1.5 0 0 0 1.5-1.5V16" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
                 </svg>
                 <div className="dropzone-title">Drop a customer PO here</div>
-                <div className="dropzone-sub">or click to browse — PDF or image</div>
+                <div className="dropzone-sub">or click to browse &mdash; PDF or image</div>
               </div>
               <input
                 ref={inputRef}
@@ -118,7 +114,7 @@ export default function PoUpload({ customers, customersLoading, customersError, 
               />
               {customersLoading && (
                 <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text3)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <div className="spinner" style={{ width: 12, height: 12 }} /> Loading customer list from Zoho…
+                  <div className="spinner" style={{ width: 12, height: 12 }} /> Loading customer list from Zoho&hellip;
                 </div>
               )}
             </>
@@ -134,7 +130,7 @@ export default function PoUpload({ customers, customersLoading, customersError, 
 
       <p style={{ marginTop: 14, fontSize: 12, color: 'var(--text3)', textAlign: 'center', lineHeight: 1.6 }}>
         Claude reads the PO, identifies the customer, and matches items to that
-        customer's price list. Pricing on the PO is ignored — your contract pricing is applied.
+        customer&apos;s price list. Pricing on the PO is ignored &mdash; your contract pricing is applied.
       </p>
     </div>
   );
