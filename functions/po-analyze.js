@@ -39,12 +39,27 @@ exports.handler = async (event) => {
 
     const customerNames = (customers || []).map(c => (typeof c === 'string' ? c : c.name)).filter(Boolean);
 
-    // Build the document/image content block
+    // Build the content block based on the file type.
+    //  - PDF                          → document block
+    //  - jpeg/png/gif/webp            → image block
+    //  - anything else (email body,   → text block (decode the base64 to text)
+    //    .txt, .eml, .html, unknown)
+    let mt = (mediaType || '').toLowerCase();
+    if (mt === 'image/jpg') mt = 'image/jpeg';
+    const validImage = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+
     let fileBlock;
-    if ((mediaType || '').toLowerCase() === 'application/pdf') {
+    if (mt === 'application/pdf') {
       fileBlock = { type: 'document', source: { type: 'base64', media_type: 'application/pdf', data: fileBase64 } };
+    } else if (validImage.includes(mt)) {
+      fileBlock = { type: 'image', source: { type: 'base64', media_type: mt, data: fileBase64 } };
     } else {
-      fileBlock = { type: 'image', source: { type: 'base64', media_type: mediaType || 'image/png', data: fileBase64 } };
+      let text = '';
+      try { text = Buffer.from(fileBase64, 'base64').toString('utf-8'); } catch (e) { text = ''; }
+      fileBlock = {
+        type: 'text',
+        text: `The purchase order below arrived as text (for example, an email body). Treat the following as the PO document:\n\n${text}`,
+      };
     }
 
     const prompt = `You are an order-entry assistant for a manufacturer. You are reading a customer's Purchase Order (PO) document.

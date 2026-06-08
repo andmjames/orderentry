@@ -24,6 +24,12 @@ export function num(val, fallback = 0) {
   return isNaN(n) ? fallback : n;
 }
 
+// Round a money amount to whole cents. Used so the unit rate is a real
+// 2-decimal price and line totals = rate × qty stay self-consistent (and match Zoho).
+export function round2(v) {
+  return Math.round((Number(v) || 0) * 100) / 100;
+}
+
 // Build {item_number -> {alias, tiers:[{min_cases, price}]}} from Supabase rows.
 export function groupPricing(rows) {
   const map = new Map();
@@ -73,7 +79,7 @@ export function buildOrderLines(matches, pricingMap, itemDetails) {
     qty = Math.round(qty * 100) / 100;
 
     const tier = priced ? priceForCases(priced.tiers, cases) : null;
-    const unitPrice = tier ? tier.price : null;
+    const unitPrice = tier ? round2(tier.price) : null;
     lines.push({
       item_number:   m.item_number,
       item_id:       detail.id || null,
@@ -87,7 +93,7 @@ export function buildOrderLines(matches, pricingMap, itemDetails) {
       cases,
       qty,
       unitPrice,
-      total:         unitPrice != null ? qty * unitPrice : null,
+      total:         unitPrice != null ? round2(qty * unitPrice) : null,
       tierMinCases:  tier ? tier.min_cases : null,
       missingPrice:  unitPrice == null,
       missingUnits:  unitsPerCase <= 0,
@@ -98,7 +104,7 @@ export function buildOrderLines(matches, pricingMap, itemDetails) {
 
 export function recomputeLine(line) {
   const qty = line.unitsPerCase > 0 ? line.cases * line.unitsPerCase : line.cases;
-  return { ...line, qty, total: line.unitPrice != null ? qty * line.unitPrice : null };
+  return { ...line, qty, total: line.unitPrice != null ? round2(qty * line.unitPrice) : null };
 }
 
 // ── Shipping address matching ────────────────────────────────────────────────

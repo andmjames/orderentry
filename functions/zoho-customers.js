@@ -12,12 +12,16 @@ exports.handler = async (event) => {
       hasMore = data.page_context?.has_more_page === true;
       page++;
     }
-    const customers = allContacts.map(c => ({
-      id:    c.contact_id,
-      name:  c.contact_name,
-      email: c.email || '',
-      phone: c.phone || '',
-    }));
+    // Exclude inactive contacts so they can't be picked or auto-matched.
+    // (Zoho returns status "active"/"inactive" per contact; treat missing as active.)
+    const customers = allContacts
+      .filter(c => String(c.status || 'active').toLowerCase() !== 'inactive')
+      .map(c => ({
+        id:    c.contact_id,
+        name:  c.contact_name,
+        email: c.email || '',
+        phone: c.phone || '',
+      }));
     return { statusCode: 200, headers, body: JSON.stringify(customers) };
   } catch (err) {
     console.error('zoho-customers error:', err);

@@ -5,7 +5,7 @@ import { buildPackingPdf } from '../lib/packingPdf';
 import { buildPalletLabelsPdf } from '../lib/palletPdf';
 import {
   groupPricing, buildOrderLines, priceForCases,
-  computeTotals, computeShipping, num, money,
+  computeTotals, computeShipping, num, money, round2,
   pickShippingAddress, formatAddress, normalizeCountry,
 } from '../lib/order';
 import OrderSummary from './OrderSummary';
@@ -212,11 +212,11 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
     qty = Math.round(qty * 100) / 100;
     const priced = pricingMap.get(line.item_number);
     const tier = priced ? priceForCases(priced.tiers, cases) : null;
-    const unitPrice = tier ? tier.price : line.unitPrice;
+    const unitPrice = tier ? round2(tier.price) : line.unitPrice;
     return {
       ...line,
       cases, qty, unitPrice,
-      total: unitPrice != null ? qty * unitPrice : null,
+      total: unitPrice != null ? round2(qty * unitPrice) : null,
       tierMinCases: tier ? tier.min_cases : line.tierMinCases,
       missingPrice: unitPrice == null,
     };
