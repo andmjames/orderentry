@@ -1,18 +1,36 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { fetchCustomer, fetchItemDetailsBySku, matchOrder, createSalesOrder } from '../lib/zoho';
+import { fetchCustomer, fetchItemDetailsBySku, matchOrder, createSalesOrder, checkDuplicatePo, attachSalesOrderPdf, attachSalesOrderFile } from '../lib/zoho';
 import { fetchCustomerPricing } from '../lib/supabase';
+import { buildPackingPdf } from '../lib/packingPdf';
+import { buildPalletLabelsPdf } from '../lib/palletPdf';
 import {
   groupPricing, buildOrderLines, priceForCases,
   computeTotals, computeShipping, num, money,
-  pickShippingAddress, formatAddress,
+  pickShippingAddress, formatAddress, normalizeCountry,
 } from '../lib/order';
 import OrderSummary from './OrderSummary';
 import OrderItemsTable from './OrderItemsTable';
 import AddItemsTable from './AddItemsTable';
 import PricingAppModal from './PricingAppModal';
+import PackingList from './PackingList';
+import PalletLabels from './PalletLabels';
 import { useToast } from './Toast';
 
 const PRICING_APP_URL = process.env.REACT_APP_PRICING_APP_URL || '';
+
+// Break a shipping address into label lines: name, street, street2, "city, ST zip", country.
+function shipToLines(addr, fallbackName) {
+  if (!addr) return [fallbackName].filter(Boolean);
+  const lines = [];
+  const name = addr.attention || fallbackName;
+  if (name) lines.push(name);
+  if (addr.address) lines.push(addr.address);
+  if (addr.street2) lines.push(addr.street2);
+  const cityLine = [[addr.city, addr.state].filter(Boolean).join(', '), addr.zip].filter(Boolean).join(' ').trim();
+  if (cityLine) lines.push(cityLine);
+  if (addr.country) lines.push(normalizeCountry(addr.country));
+  return lines;
+}
 
 // Build the display catalog + price-break levels from pricing rows + Zoho item details.
 function buildCatalogDisplay(pmap, details) {
@@ -38,7 +56,7 @@ function buildCatalogDisplay(pmap, details) {
   return { display, levels };
 }
 
-export default function OrderReview({ analysis, fileName, customers, onBack }) {
+export default function OrderReview({ analysis, fileName, poFile, customers, onBack }) {
   const toast = useToast();
 
   // Resolve the AI's customer guess to a real customer stub.
@@ -59,6 +77,13 @@ export default function OrderReview({ analysis, fileName, customers, onBack }) {
   const [showPicker, setShowPicker] = useState(false);
   const [showPricingApp, setShowPricingApp] = useState(false);
   const [poNumber, setPoNumber] = useState(analysis.po_number || '');
+  const [freightOverride, setFreightOverride] = useState(null); // null = use calculated
+  const [poDuplicate, setPoDuplicate] = useState(false);
+  const [packingData, setPackingData] = useState(null);
+  const [showPacking, setShowPacking] = useState(false);
+  const [palletData, setPalletData] = useState(null);
+  const [showPallet, setShowPallet] = useState(false);
+  const [showRemarks, setShowRemarks] = useState(false);
   const [excluded, setExcluded] = useState([]);
   const [methodOverride, setMethodOverride] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -70,7 +95,8 @@ export default function OrderReview({ analysis, fileName, customers, onBack }) {
   const load = useCallback(async (id) => {
     if (!id) { setCustomer(null); setLines([]); setExcluded([]); return; }
     setLoading(true); setError(null); setResult(null); setApproved(false);
-    setMethodOverride(null); setShowPicker(false);
+    setMethodOverride(null); setShowPicker(false); setFreightOverride(null);
+    setPalletData(null); setShowPallet(false); setShowRemarks(false);
     try {
       const cust = await fetchCustomer(id);
       setCustomer(cust);
@@ -131,9 +157,38 @@ export default function OrderReview({ analysis, fileName, customers, onBack }) {
 
   useEffect(() => { load(customerId); }, [customerId, load]);
 
+  // Warn if this PO number already exists for this customer in Zoho (debounced).
+  useEffect(() => {
+    setPoDuplicate(false);
+    if (!customerId || !poNumber.trim()) return;
+    let ignore = false;
+    const t = setTimeout(() => {
+      checkDuplicatePo({ customerId, poNumber: poNumber.trim() })
+        .then(res => { if (!ignore) setPoDuplicate(!!res.duplicate); })
+        .catch(() => { if (!ignore) setPoDuplicate(false); });
+    }, 600);
+    return () => { ignore = true; clearTimeout(t); };
+  }, [customerId, poNumber]);
+
   const currency = customer?.currencyCode || 'USD';
   const totals = computeTotals(lines);
-  const shipping = computeShipping(customer, totals, methodOverride);
+  const poAccounts = {
+    parcel:  analysis.parcel_account_number || '',
+    freight: analysis.freight_account_number || '',
+  };
+  const shipping = computeShipping(customer, totals, methodOverride, poAccounts);
+  const effectiveFreight = freightOverride != null ? freightOverride : shipping.freightCharge;
+
+  // Hide an "excluded" PO line once that item exists on the customer's price
+  // list (catalog) or has been added to the order — matched by item number/alias.
+  const normKey = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const knownKeys = new Set();
+  catalog.forEach(c => { if (c.item_number) knownKeys.add(normKey(c.item_number)); if (c.alias) knownKeys.add(normKey(c.alias)); });
+  lines.forEach(l => { if (l.item_number) knownKeys.add(normKey(l.item_number)); if (l.alias) knownKeys.add(normKey(l.alias)); });
+  const visibleExcluded = excluded.filter(e => {
+    const id = normKey(e.identifier);
+    return !(id && knownKeys.has(id));
+  });
 
   // Recompute a line from either a new case count or a new unit quantity.
   // Cases ⇄ Quantity stay in sync (qty = cases × units/case), and the price
@@ -171,6 +226,17 @@ export default function OrderReview({ analysis, fileName, customers, onBack }) {
   function onQtyChange(idx, val) {
     const qty = parseFloat(val);
     setLines(prev => prev.map((l, i) => i === idx ? repriceLine(l, { qty: isNaN(qty) ? 0 : qty }) : l));
+    setApproved(false);
+  }
+
+  function onReorder(from, to) {
+    setLines(prev => {
+      if (from < 0 || from >= prev.length || to < 0 || to >= prev.length) return prev;
+      const next = prev.slice();
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
     setApproved(false);
   }
 
@@ -233,11 +299,6 @@ export default function OrderReview({ analysis, fileName, customers, onBack }) {
     try {
       const dropped = lines.length - sendable.length;
       const selectedAddr = addresses.find(a => a.id === selectedAddrId);
-      const noteParts = [];
-      if (poNumber) noteParts.push(`Customer PO ${poNumber}`);
-      noteParts.push(`Ship via ${shipping.shippingMethod} (${shipping.methodType})`);
-      if (shipping.shippingAccount) noteParts.push(`Shipping acct ${shipping.shippingAccount}`);
-      noteParts.push(`${shipping.pallets} pallet(s), ${shipping.weight} lb, ${totals.cases} cases`);
 
       const payload = {
         customer_id: customer.id,
@@ -250,8 +311,9 @@ export default function OrderReview({ analysis, fileName, customers, onBack }) {
           rate: l.unitPrice,
           unit: l.unit || '',
         })),
-        shipping_charge: shipping.freightCharge,
-        notes: noteParts.join(' • '),
+        shipping_charge: effectiveFreight,
+        delivery_method: shipping.shippingMethod || '',
+        comment: `Pallets: ${shipping.pallets} • Weight: ${shipping.weight} lb • Cases: ${totals.cases}`,
       };
 
       if (selectedAddr?.addr) {
@@ -269,8 +331,87 @@ export default function OrderReview({ analysis, fileName, customers, onBack }) {
 
       const res = await createSalesOrder(payload);
       setResult(res);
+      const packing = {
+        customerName: customer.name,
+        shipTo: selectedAddr?.addr ? formatAddress(selectedAddr.addr) : '',
+        invoiceNumber: res.salesorder_number || res.salesorder_id || '',
+        poNumber,
+        totals: { cases: totals.cases, pallets: shipping.pallets, weight: shipping.weight },
+        lines: sendable.map(l => ({
+          qty: l.qty, unit: l.unit, cases: l.cases,
+          item_number: l.item_number, description: l.description,
+        })),
+        note: /ryonet/i.test(customer.name || '') ? '**Barcodes on all Rolls and Cartons**' : '',
+      };
+      setPackingData(packing);
+
+      // Pallet labels only when the shipment is going by freight.
+      const pallet = (shipping.methodType === 'freight' && shipping.pallets > 0) ? {
+        poNumber,
+        invoiceNumber: packing.invoiceNumber,
+        shipToLines: shipToLines(selectedAddr?.addr, customer.name),
+        palletCount: shipping.pallets,
+      } : null;
+      setPalletData(pallet);
+
+      // If the customer has Remarks, show them first; otherwise go straight to the packing list.
+      if (customer.remarks && String(customer.remarks).trim()) {
+        setShowRemarks(true);
+      } else {
+        setShowPacking(true);
+      }
+
       toast(`Sales Order ${res.salesorder_number || ''} created in Zoho`.trim());
       if (dropped > 0) toast(`${dropped} line(s) skipped (missing item or price)`, 'error');
+
+      // Generate the packing list PDF and attach it to the sales order in Zoho.
+      if (res.salesorder_id) {
+        try {
+          const pdfBase64 = buildPackingPdf(packing);
+          await attachSalesOrderPdf({
+            salesorderId: res.salesorder_id,
+            filename: `Packing-List-${packing.invoiceNumber || res.salesorder_id}.pdf`,
+            pdfBase64,
+          });
+          toast('Packing list attached to the sales order');
+        } catch (e) {
+          toast(`Could not attach packing list: ${e.message}`, 'error');
+        }
+
+        // Attach the original uploaded purchase order to the sales order.
+        if (poFile && poFile.base64) {
+          try {
+            const ext = (poFile.mediaType || '').includes('pdf') ? 'pdf'
+              : (poFile.mediaType || '').includes('png') ? 'png'
+              : (poFile.mediaType || '').includes('webp') ? 'webp'
+              : (poFile.mediaType || '').match(/jpe?g/) ? 'jpg' : 'pdf';
+            await attachSalesOrderFile({
+              salesorderId: res.salesorder_id,
+              filename: `PO-${packing.invoiceNumber || res.salesorder_id}.${ext}`,
+              fileBase64: poFile.base64,
+              contentType: poFile.mediaType || 'application/pdf',
+            });
+            toast('Purchase order attached to the sales order');
+          } catch (e) {
+            toast(`Could not attach purchase order: ${e.message}`, 'error');
+          }
+        }
+
+        // Attach the pallet labels PDF (freight only).
+        if (pallet) {
+          try {
+            const palletPdf = await buildPalletLabelsPdf(pallet);
+            await attachSalesOrderPdf({
+              salesorderId: res.salesorder_id,
+              filename: `Pallet-Labels-${pallet.invoiceNumber || res.salesorder_id}.pdf`,
+              pdfBase64: palletPdf,
+            });
+            toast('Pallet labels attached to the sales order');
+          } catch (e) {
+            toast(`Could not attach pallet labels: ${e.message}`, 'error');
+          }
+        }
+      }
     } catch (e) {
       toast(`Send failed: ${e.message}`, 'error');
     } finally {
@@ -316,7 +457,14 @@ export default function OrderReview({ analysis, fileName, customers, onBack }) {
               )}
             </div>
             <div className="field-group">
-              <label className="field-label">Customer PO #</label>
+              <label className="field-label">
+                Customer PO #
+                {poDuplicate && (
+                  <span style={{ color: 'var(--danger)', fontWeight: 600, marginLeft: 8 }}>
+                    Warning: This is a duplicate purchase order.
+                  </span>
+                )}
+              </label>
               <input
                 className="field-input"
                 value={poNumber}
@@ -371,14 +519,20 @@ export default function OrderReview({ analysis, fileName, customers, onBack }) {
             currency={currency}
             methodOverride={methodOverride}
             onMethodChange={setMethodOverride}
+            freightValue={effectiveFreight}
+            freightCalculated={shipping.freightCharge}
+            freightOverridden={freightOverride != null}
+            onFreightChange={(v) => setFreightOverride(v)}
+            onFreightReset={() => setFreightOverride(null)}
           />
           <OrderItemsTable
             lines={lines}
-            excluded={excluded}
+            excluded={visibleExcluded}
             currency={currency}
             onCasesChange={onCasesChange}
             onQtyChange={onQtyChange}
             onRemove={onRemove}
+            onReorder={onReorder}
             onAddItems={() => setShowPicker(s => !s)}
             addOpen={showPicker}
           />
@@ -407,12 +561,20 @@ export default function OrderReview({ analysis, fileName, customers, onBack }) {
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <span style={{ fontSize: 13, color: 'var(--text2)' }}>
-                  Total: <strong style={{ color: 'var(--text)' }}>{money(totals.subtotal + shipping.freightCharge, currency)}</strong>
+                  Total: <strong style={{ color: 'var(--text)' }}>{money(totals.subtotal + effectiveFreight, currency)}</strong>
                 </span>
                 {result ? (
-                  <span className="badge badge-green" style={{ fontSize: 12, padding: '6px 12px' }}>
-                    ✓ Sent · SO {result.salesorder_number || result.salesorder_id || ''}
-                  </span>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span className="badge badge-green" style={{ fontSize: 12, padding: '6px 12px' }}>
+                      ✓ Sent · SO {result.salesorder_number || result.salesorder_id || ''}
+                    </span>
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => { window.location.href = 'https://inventory.zoho.com/app#/salesorders'; }}
+                    >
+                      Go to Zoho
+                    </button>
+                  </div>
                 ) : (
                   <button className="btn btn-primary" disabled={!approved || sending || cannotSend} onClick={handleSend}>
                     {sending ? (<><span className="spinner" style={{ borderTopColor: 'var(--bg)', borderColor: 'rgba(255,255,255,.4)' }} /> Sending…</>) : 'Send to Zoho'}
@@ -422,6 +584,35 @@ export default function OrderReview({ analysis, fileName, customers, onBack }) {
             </div>
           </div>
         </>
+      )}
+
+      {showRemarks && customer && (
+        <div className="modal-overlay" onClick={() => { setShowRemarks(false); setShowPacking(true); }}>
+          <div className="modal" style={{ maxWidth: 460, padding: 0 }} onClick={e => e.stopPropagation()}>
+            <div style={{ padding: '14px 18px', borderBottom: '.5px solid var(--border)', fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>
+              Customer Remarks — {customer.name}
+            </div>
+            <div style={{ padding: '16px 18px', fontSize: 13.5, lineHeight: 1.6, color: 'var(--text)', whiteSpace: 'pre-wrap', maxHeight: '50vh', overflow: 'auto' }}>
+              {customer.remarks}
+            </div>
+            <div style={{ padding: '12px 18px', borderTop: '.5px solid var(--border)', display: 'flex', justifyContent: 'flex-end' }}>
+              <button className="btn btn-primary" onClick={() => { setShowRemarks(false); setShowPacking(true); }}>
+                Continue to Packing List
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showPacking && packingData && (
+        <PackingList
+          data={packingData}
+          onClose={() => { setShowPacking(false); if (palletData) setShowPallet(true); }}
+        />
+      )}
+
+      {showPallet && palletData && (
+        <PalletLabels data={palletData} onClose={() => setShowPallet(false)} />
       )}
 
       {showPricingApp && PRICING_APP_URL && (

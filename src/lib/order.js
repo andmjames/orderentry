@@ -83,6 +83,7 @@ export function buildOrderLines(matches, pricingMap, itemDetails) {
       unitsPerCase,
       weightPerCase: num(detail.weightPerCase, 0),
       casesPerPallet:num(detail.casesPerPallet, 0),
+      availableStock: (detail.availableStock === null || detail.availableStock === undefined) ? null : Number(detail.availableStock),
       cases,
       qty,
       unitPrice,
@@ -112,12 +113,19 @@ function normalizeCode(s) {
   return t.length <= 3 ? t.toUpperCase() : titleCase(t);
 }
 
+export function normalizeCountry(c) {
+  if (!c) return c;
+  const k = String(c).toLowerCase().replace(/[.\s]/g, '');
+  if (k === 'us' || k === 'usa' || k === 'unitedstates' || k === 'unitedstatesofamerica') return 'U.S.A';
+  return c;
+}
+
 export function formatAddress(a) {
   if (!a) return '';
   const street = [a.address || a.street, a.street2].filter(Boolean).join(', ');
   const cityState = [a.city, a.state].filter(Boolean).join(', ');
   const tail = [cityState, a.zip].filter(Boolean).join(' ');
-  const out = [a.attention, street, tail, a.country].filter(Boolean).join(' · ');
+  const out = [a.attention, street, tail, normalizeCountry(a.country)].filter(Boolean).join(' · ');
   return out || a.text || '';
 }
 
@@ -186,8 +194,9 @@ export function pickShippingAddress(poAddr, existing) {
 const FREIGHT_WEIGHT_THRESHOLD = 160; // >= 160 lb (product weight) → freight, else parcel
 const PALLET_WEIGHT_LB = 40;          // freight adds 40 lb per pallet
 
-export function computeShipping(customer, totals, methodOverride) {
+export function computeShipping(customer, totals, methodOverride, poAccounts) {
   const c = customer || {};
+  const po = poAccounts || {};
   const parcelPerLb  = num(c.parcelPricePerLb, 0);
   const freightPerLb = num(c.freightPricePerLb, 0);
   const baseWeight = totals.baseWeight || 0;
@@ -207,9 +216,15 @@ export function computeShipping(customer, totals, methodOverride) {
   const palletWeight = methodType === 'freight' ? pallets * PALLET_WEIGHT_LB : 0;
   const weight = Math.round((baseWeight + palletWeight) * 100) / 100;
 
-  const account = methodType === 'freight'
+  // Account number for the active method. A different account listed on the PO
+  // overrides the one on file (for this order).
+  const onFileAccount = methodType === 'freight'
     ? (c.freightAccountNumber || '')
     : (c.parcelAccountNumber || '');
+  const poAccount = String((methodType === 'freight' ? po.freight : po.parcel) || '').trim();
+  const norm = s => String(s || '').toLowerCase().replace(/\s/g, '');
+  const accountFromPo = !!poAccount && norm(poAccount) !== norm(onFileAccount);
+  const account = poAccount || onFileAccount;
   const hasAccount = !!String(account).trim();
 
   // Charge rules:
@@ -219,7 +234,7 @@ export function computeShipping(customer, totals, methodOverride) {
   let freightCharge, chargeBasis;
   if (hasAccount) {
     freightCharge = 0;
-    chargeBasis = `Billed to ${methodType} account on file`;
+    chargeBasis = `Billed to ${methodType} account ${accountFromPo ? 'from PO' : 'on file'}`;
   } else {
     const perLb = methodType === 'freight' ? freightPerLb : parcelPerLb;
     const label = methodType === 'freight' ? 'Freight $/LB' : 'Parcel $/LB';
@@ -233,7 +248,7 @@ export function computeShipping(customer, totals, methodOverride) {
     : (c.methodIfParcel || 'Parcel');
 
   return {
-    methodType, shippingMethod, shippingAccount: account, hasAccount,
+    methodType, shippingMethod, shippingAccount: account, hasAccount, accountFromPo,
     pallets, baseWeight: Math.round(baseWeight * 100) / 100, palletWeight,
     weight, freightCharge, chargeBasis,
   };

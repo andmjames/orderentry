@@ -1,8 +1,18 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { money } from '../lib/order';
 
-export default function OrderItemsTable({ lines, excluded, currency, onCasesChange, onQtyChange, onRemove, onAddItems, addOpen }) {
+const CALENDAR_URL = 'https://teamup.com/ks85fyeys7howgnc42';
+
+export default function OrderItemsTable({ lines, excluded, currency, onCasesChange, onQtyChange, onRemove, onReorder, onAddItems, addOpen }) {
   const subtotal = lines.reduce((s, l) => s + (l.total != null ? l.total : 0), 0);
+  const [dragIndex, setDragIndex] = useState(null);
+  const [overIndex, setOverIndex] = useState(null);
+
+  function handleDrop(toIndex) {
+    if (dragIndex != null && dragIndex !== toIndex && onReorder) onReorder(dragIndex, toIndex);
+    setDragIndex(null);
+    setOverIndex(null);
+  }
 
   return (
     <div className="section">
@@ -27,9 +37,11 @@ export default function OrderItemsTable({ lines, excluded, currency, onCasesChan
         <table className="ot-table">
           <thead>
             <tr>
+              <th className="ot-th" style={{ width: 24 }} />
               <th className="ot-th ot-num">Qty</th>
               <th className="ot-th">U/M</th>
               <th className="ot-th">Item #</th>
+              <th className="ot-th ot-num">Available</th>
               <th className="ot-th ot-num">Rolls/Case</th>
               <th className="ot-th ot-num">Cases</th>
               <th className="ot-th ot-num">Unit Price</th>
@@ -39,7 +51,7 @@ export default function OrderItemsTable({ lines, excluded, currency, onCasesChan
           </thead>
           <tbody>
             {lines.length === 0 && (
-              <tr><td className="ot-td" colSpan={8} style={{ textAlign: 'center', color: 'var(--text3)', padding: '2rem' }}>
+              <tr><td className="ot-td" colSpan={10} style={{ textAlign: 'center', color: 'var(--text3)', padding: '2rem' }}>
                 No matched items.
               </td></tr>
             )}
@@ -55,9 +67,25 @@ export default function OrderItemsTable({ lines, excluded, currency, onCasesChan
               const caseWord = (n) => (n === 1 ? 'Case' : 'Cases');
               const lowerQty = lowerCases * l.unitsPerCase;
               const higherQty = higherCases * l.unitsPerCase;
+              // Short if ordered quantity exceeds available (negative availability counts as 0).
+              const shortBy = l.availableStock != null ? (l.qty - Math.max(0, l.availableStock)) : 0;
+              const isShort = l.availableStock != null && shortBy > 0.0001;
               return (
               <React.Fragment key={l.item_number + i}>
-              <tr className="ot-row">
+              <tr
+                className="ot-row"
+                onDragOver={(e) => { e.preventDefault(); if (overIndex !== i) setOverIndex(i); }}
+                onDrop={() => handleDrop(i)}
+                style={overIndex === i && dragIndex != null && dragIndex !== i ? { boxShadow: 'inset 0 2px 0 var(--text)' } : undefined}
+              >
+                <td
+                  className="ot-td"
+                  style={{ textAlign: 'center', cursor: 'grab', color: 'var(--text3)', userSelect: 'none' }}
+                  draggable
+                  onDragStart={() => setDragIndex(i)}
+                  onDragEnd={() => { setDragIndex(null); setOverIndex(null); }}
+                  title="Drag to reorder"
+                >⠿</td>
                 <td className="ot-td ot-num">
                   <input
                     className="ot-edit"
@@ -72,6 +100,9 @@ export default function OrderItemsTable({ lines, excluded, currency, onCasesChan
                   {l.alias && <span style={{ color: 'var(--text3)', fontWeight: 400, fontSize: 11 }}> · {l.alias}</span>}
                   {l.missingPrice && <span className="badge badge-gray" style={{ marginLeft: 6 }}>no price</span>}
                   {l.missingUnits && <span className="badge badge-gray" style={{ marginLeft: 6 }}>no units/case</span>}
+                </td>
+                <td className="ot-td ot-num" style={l.availableStock != null && l.availableStock < l.qty ? { color: 'var(--danger)', fontWeight: 600 } : { color: 'var(--text2)' }}>
+                  {l.availableStock == null ? '—' : Number(l.availableStock).toLocaleString('en-US', { maximumFractionDigits: 0 })}
                 </td>
                 <td className="ot-td ot-num">{l.unitsPerCase || '—'}</td>
                 <td className="ot-td ot-num">
@@ -90,12 +121,28 @@ export default function OrderItemsTable({ lines, excluded, currency, onCasesChan
               </tr>
               {partialCase && (
                 <tr className="partial-case-row">
-                  <td className="ot-td" colSpan={8} style={{ background: 'var(--warn-bg)', color: 'var(--warn)', fontSize: 12, padding: '5px 10px', borderBottom: '.5px solid var(--border)' }}>
+                  <td className="ot-td" colSpan={10} style={{ background: 'var(--warn-bg)', color: 'var(--warn)', fontSize: 13, padding: '5px 10px', borderBottom: '.5px solid var(--border)' }}>
                     {lowerCases < 1 ? (
                       <>⚠ This is not a complete case. Ask the customer if they would like a complete case ({higherCases} {caseWord(higherCases)} = {higherQty.toLocaleString('en-US')} {unitWord(higherQty)}).</>
                     ) : (
                       <>⚠ This is not a complete case. Ask the customer if they would prefer {lowerCases} {caseWord(lowerCases)} ({lowerQty.toLocaleString('en-US')} {unitWord(lowerQty)}) or {higherCases} {caseWord(higherCases)} ({higherQty.toLocaleString('en-US')} {unitWord(higherQty)}).</>
                     )}
+                  </td>
+                </tr>
+              )}
+              {isShort && (
+                <tr className="short-stock-row">
+                  <td className="ot-td" colSpan={10} style={{ background: 'var(--warn-bg)', color: 'var(--warn)', fontSize: 13, padding: '5px 10px', borderBottom: '.5px solid var(--border)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                      <span>⚠ Short {Math.round(shortBy).toLocaleString('en-US')} {unitWord(Math.round(shortBy))}{l.unitsPerCase > 0 ? <> ({(shortBy / l.unitsPerCase).toLocaleString('en-US', { maximumFractionDigits: 2 })} {caseWord(shortBy / l.unitsPerCase === 1 ? 1 : 2)})</> : ''} for this order</span>
+                      <button
+                        className="btn btn-sm"
+                        style={{ borderColor: 'var(--warn)', color: 'var(--warn)', whiteSpace: 'nowrap', flexShrink: 0 }}
+                        onClick={() => window.open(CALENDAR_URL, 'pmi-production-calendar', 'width=1100,height=820')}
+                      >
+                        Schedule this Item
+                      </button>
+                    </div>
                   </td>
                 </tr>
               )}
@@ -106,7 +153,7 @@ export default function OrderItemsTable({ lines, excluded, currency, onCasesChan
           {lines.length > 0 && (
             <tfoot>
               <tr className="ot-foot">
-                <td colSpan={6} className="ot-num">Subtotal</td>
+                <td colSpan={8} className="ot-num" style={{ textAlign: 'right' }}>Subtotal</td>
                 <td className="ot-num">{money(subtotal, currency)}</td>
                 <td />
               </tr>

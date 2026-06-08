@@ -28,10 +28,33 @@ export async function fetchCustomer(customerId) {
 
 // ── Items ────────────────────────────────────────────────────────────────────
 export async function fetchItemDetailsBySku(skus) {
-  return apiFetch('/zoho-items-by-sku', {
-    method: 'POST',
-    body: JSON.stringify({ skus }),
-  });
+  if (!skus || !skus.length) return [];
+  const attempts = 3;
+  let lastErr;
+  for (let a = 0; a < attempts; a++) {
+    try {
+      const res = await apiFetch('/zoho-items-by-sku', {
+        method: 'POST',
+        body: JSON.stringify({ skus }),
+      });
+      const arr = Array.isArray(res) ? res : [];
+      // Treat a systemically-empty result (nothing came back, or every item is
+      // missing all Zoho detail fields) as a transient failure worth retrying —
+      // that's the "all columns blank / no units/case" symptom.
+      const noneUsable = arr.length === 0 || arr.every(d =>
+        (d.unitsPerCase === '' || d.unitsPerCase == null) &&
+        (d.weightPerCase === '' || d.weightPerCase == null) &&
+        (d.availableStock == null)
+      );
+      if (!noneUsable || a === attempts - 1) return arr;
+    } catch (e) {
+      lastErr = e;
+      if (a === attempts - 1) throw e;
+    }
+    await new Promise(r => setTimeout(r, 400 * Math.pow(2, a) + Math.random() * 200));
+  }
+  if (lastErr) throw lastErr;
+  return [];
 }
 
 // ── Claude (Sonnet) PO analysis ──────────────────────────────────────────────
@@ -54,5 +77,24 @@ export async function createSalesOrder(order) {
   return apiFetch('/zoho-create-salesorder', {
     method: 'POST',
     body: JSON.stringify(order),
+  });
+}
+
+export async function checkDuplicatePo({ customerId, poNumber }) {
+  const qs = `?customer_id=${encodeURIComponent(customerId)}&po_number=${encodeURIComponent(poNumber)}`;
+  return apiFetch(`/zoho-check-po${qs}`);
+}
+
+export async function attachSalesOrderPdf({ salesorderId, filename, pdfBase64 }) {
+  return apiFetch('/zoho-attach-salesorder', {
+    method: 'POST',
+    body: JSON.stringify({ salesorder_id: salesorderId, filename, pdf_base64: pdfBase64, content_type: 'application/pdf' }),
+  });
+}
+
+export async function attachSalesOrderFile({ salesorderId, filename, fileBase64, contentType }) {
+  return apiFetch('/zoho-attach-salesorder', {
+    method: 'POST',
+    body: JSON.stringify({ salesorder_id: salesorderId, filename, file_base64: fileBase64, content_type: contentType }),
   });
 }

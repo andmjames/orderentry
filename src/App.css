@@ -33,7 +33,7 @@
 
 /* ─── Reset ───────────────────────────────────────────────────────── */
 *,*::before,*::after { box-sizing: border-box; margin: 0; padding: 0; }
-html { font-size: 14px; }
+html { font-size: 14px; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 body {
   font-family: var(--font-sans);
   background: var(--bg2);
@@ -355,9 +355,9 @@ input[type=number] { -moz-appearance: textfield; appearance: textfield; }
 .ot-td { padding: 7px 10px; border-bottom: .5px solid var(--border); color: var(--text);
   vertical-align: middle; background: var(--bg); font-size: 13px; }
 .ot-row:hover td { background: var(--bg2); }
-.ot-num { text-align: right; font-variant-numeric: tabular-nums; }
+.ot-num { text-align: center; font-variant-numeric: tabular-nums; }
 .ot-item { font-weight: 600; }
-.ot-edit { width: 64px; text-align: right; font-family: inherit; font-size: 13px;
+.ot-edit { width: 64px; text-align: center; font-family: inherit; font-size: 13px;
   border: .5px solid var(--border2); border-radius: 6px; padding: 4px 6px; color: var(--text);
   background: var(--bg); outline: none; }
 .ot-edit:focus { border-color: var(--text); }
@@ -366,3 +366,81 @@ input[type=number] { -moz-appearance: textfield; appearance: textfield; }
 
 .excluded-row { background: var(--warn-bg); }
 .excluded-row td { color: var(--warn); font-size: 12px; }
+
+/* ─── Print (packing list = Letter, pallet labels = 6x4) ──────────── */
+@media print {
+  #root { display: none !important; }
+  .no-print { display: none !important; }
+  /* Both print overlays hidden by default; the print-intent class on <html> reveals one. */
+  .packing-overlay, .pallet-overlay { display: none !important; }
+
+  /* Packing list */
+  html.printing-packing .packing-overlay {
+    position: static !important;
+    display: block !important;
+    background: none !important;
+    padding: 0 !important;
+  }
+  html.printing-packing .packing-overlay .modal {
+    position: static !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: none !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    background: #fff !important;
+  }
+  html.printing-packing .packing-wrap { padding: 0 !important; display: block !important; }
+  html.printing-packing .packing-list {
+    width: 8.5in !important;
+    padding: 0.5in !important;
+    box-sizing: border-box !important;
+    box-shadow: none !important;
+  }
+
+  /* Pallet labels — one 6x4 page per label */
+  html.printing-labels .pallet-overlay {
+    position: static !important;
+    display: block !important;
+    background: none !important;
+    padding: 0 !important;
+  }
+  html.printing-labels .pallet-overlay .modal {
+    position: static !important;
+    width: auto !important;
+    max-width: none !important;
+    max-height: none !important;
+    overflow: visible !important;
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0 !important;
+    background: #fff !important;
+  }
+  html.printing-labels .pallet-wrap { padding: 0 !important; display: block !important; gap: 0 !important; }
+  /* Each label prints on a portrait 4x6 page; the 6x4 layout is rotated 90° to fit. */
+  html.printing-labels .pallet-page {
+    width: 4in !important;
+    height: 6in !important;
+    position: relative !important;
+    overflow: hidden !important;
+    page-break-after: always;
+    break-after: page;
+  }
+  html.printing-labels .pallet-page:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+  html.printing-labels .pallet-label {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 6in !important;
+    height: 4in !important;
+    margin: 0 !important;
+    border: none !important;
+    transform: translate(4in, 0) rotate(90deg);
+    transform-origin: 0 0;
+  }
+}

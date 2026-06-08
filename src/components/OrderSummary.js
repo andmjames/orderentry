@@ -1,5 +1,5 @@
 import React from 'react';
-import { money } from '../lib/order';
+import { money, currencySymbol } from '../lib/order';
 
 function Metric({ label, value, sub }) {
   return (
@@ -12,7 +12,10 @@ function Metric({ label, value, sub }) {
   );
 }
 
-export default function OrderSummary({ totals, shipping, currency, methodOverride, onMethodChange }) {
+export default function OrderSummary({
+  totals, shipping, currency, methodOverride, onMethodChange,
+  freightValue, freightCalculated, freightOverridden, onFreightChange, onFreightReset,
+}) {
   return (
     <div className="section">
       <div className="section-header">
@@ -39,11 +42,31 @@ export default function OrderSummary({ totals, shipping, currency, methodOverrid
         <div className="metric-grid">
           <Metric label="No. of Cases on Order" value={totals.cases} />
           <Metric label="No. of Pallets" value={shipping.pallets} />
-          <Metric
-            label="Freight Charge"
-            value={money(shipping.freightCharge, currency)}
-            sub={shipping.hasAccount ? '(acct on file)' : ''}
-          />
+
+          {/* Editable Freight Charge — defaults to the calculated value */}
+          <div className="metric">
+            <div className="metric-label">Freight Charge</div>
+            <div className="metric-value" style={{ display: 'flex', alignItems: 'baseline', gap: 2 }}>
+              <span>{currencySymbol(currency)}</span>
+              <input
+                className="ot-edit"
+                type="number" min="0" step="0.01"
+                style={{ width: 90, textAlign: 'left', fontSize: 18, fontWeight: 600, padding: '2px 4px' }}
+                value={freightValue}
+                onChange={e => onFreightChange(e.target.value === '' ? 0 : parseFloat(e.target.value))}
+              />
+            </div>
+            <div style={{ fontSize: 10.5, color: 'var(--text3)', marginTop: 3 }}>
+              {freightOverridden ? (
+                <>manual · calc {money(freightCalculated, currency)} ·{' '}
+                  <span onClick={onFreightReset} style={{ color: 'var(--text2)', textDecoration: 'underline', cursor: 'pointer' }}>reset</span>
+                </>
+              ) : (
+                shipping.hasAccount ? 'auto · acct on file' : 'auto'
+              )}
+            </div>
+          </div>
+
           <Metric
             label="Shipping Method"
             value={shipping.shippingMethod}
@@ -59,6 +82,7 @@ export default function OrderSummary({ totals, shipping, currency, methodOverrid
             value={shipping.shippingAccount
               ? shipping.shippingAccount
               : <span style={{ color: 'var(--text3)', fontWeight: 500, fontSize: 13 }}>None on file</span>}
+            sub={shipping.accountFromPo ? '(from PO)' : ''}
           />
         </div>
 
@@ -67,6 +91,7 @@ export default function OrderSummary({ totals, shipping, currency, methodOverrid
           {shipping.methodType === 'freight' && shipping.palletWeight > 0 && (
             <> · {shipping.baseWeight} lb product + {shipping.palletWeight} lb pallets</>
           )}
+          {shipping.accountFromPo && <> · shipping account taken from PO</>}
         </div>
       </div>
     </div>
