@@ -54,6 +54,40 @@ export default function PoUpload({ customers, customersLoading, customersError, 
     runAnalysis(file);
   }, [pendingFile, customersLoading, customersError, runAnalysis]);
 
+  // Auto-load a PO linked via ?po_file=<url> (e.g. a Supabase storage URL).
+  // Fetch it, wrap it as a File, and hand it to the same flow as a manual upload —
+  // the pending-file logic above waits for the customer list before analyzing.
+  useEffect(() => {
+    const poUrl = new URLSearchParams(window.location.search).get('po_file');
+    if (!poUrl) return;
+    let cancelled = false;
+    setBusy(true);
+    setError(null);
+    setStage('Loading linked purchase order…');
+    (async () => {
+      try {
+        const resp = await fetch(poUrl);
+        if (!resp.ok) throw new Error(`Could not fetch the linked PO (HTTP ${resp.status})`);
+        const blob = await resp.blob();
+        if (cancelled) return;
+        const raw = (poUrl.split('/').pop() || 'purchase-order.pdf').split('?')[0];
+        let name = 'purchase-order.pdf';
+        try { name = decodeURIComponent(raw) || name; } catch { name = raw || name; }
+        const type = blob.type || (/\.pdf$/i.test(name) ? 'application/pdf' : 'application/octet-stream');
+        const file = new File([blob], name, { type });
+        setFileName(name);
+        setPendingFile(file);
+      } catch (e) {
+        if (!cancelled) {
+          setError(e.message || 'Could not load the linked purchase order');
+          setBusy(false);
+          setStage('');
+        }
+      }
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
   function handleFile(file) {
     if (!file) return;
     setError(null);
