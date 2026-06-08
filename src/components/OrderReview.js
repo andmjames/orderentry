@@ -56,6 +56,27 @@ function buildCatalogDisplay(pmap, details) {
   return { display, levels };
 }
 
+// Price breaks are reached by the COMBINED order, not per item: a customer can
+// mix different items to hit a tier. So pick every line's price-break tier from
+// the total case count across all lines, then reprice each line at that tier.
+function applyOrderTierPricing(lines, pmap) {
+  const totalCases = lines.reduce((s, l) => s + (Number(l.cases) || 0), 0);
+  return lines.map(l => {
+    const priced = pmap.get(l.item_number);
+    if (!priced) return l;
+    const tier = priceForCases(priced.tiers, totalCases);
+    const unitPrice = tier ? round2(tier.price) : l.unitPrice;
+    const qty = Number(l.qty) || 0;
+    return {
+      ...l,
+      unitPrice,
+      total: unitPrice != null ? round2(qty * unitPrice) : null,
+      tierMinCases: tier ? tier.min_cases : l.tierMinCases,
+      missingPrice: unitPrice == null,
+    };
+  });
+}
+
 export default function OrderReview({ analysis, fileName, poFile, customers, onBack }) {
   const toast = useToast();
 
@@ -140,7 +161,7 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
       }
 
       const built = buildOrderLines(matchRes.matches || [], pmap, details);
-      setLines(built);
+      setLines(applyOrderTierPricing(built, pmap));
 
       const unmatched = (matchRes.unmatched || []).map(u => {
         const li = lineItems[u.po_index] || {};
@@ -225,13 +246,19 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
 
   function onCasesChange(idx, val) {
     const cases = parseFloat(val);
-    setLines(prev => prev.map((l, i) => i === idx ? repriceLine(l, { cases: isNaN(cases) ? 0 : cases }) : l));
+    setLines(prev => applyOrderTierPricing(
+      prev.map((l, i) => i === idx ? repriceLine(l, { cases: isNaN(cases) ? 0 : cases }) : l),
+      pricingMap,
+    ));
     setApproved(false);
   }
 
   function onQtyChange(idx, val) {
     const qty = parseFloat(val);
-    setLines(prev => prev.map((l, i) => i === idx ? repriceLine(l, { qty: isNaN(qty) ? 0 : qty }) : l));
+    setLines(prev => applyOrderTierPricing(
+      prev.map((l, i) => i === idx ? repriceLine(l, { qty: isNaN(qty) ? 0 : qty }) : l),
+      pricingMap,
+    ));
     setApproved(false);
   }
 
@@ -247,7 +274,7 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
   }
 
   function onRemove(idx) {
-    setLines(prev => prev.filter((_, i) => i !== idx));
+    setLines(prev => applyOrderTierPricing(prev.filter((_, i) => i !== idx), pricingMap));
     setApproved(false);
   }
 
@@ -259,7 +286,7 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
       const q = (qty === undefined || qty === null || qty === '')
         ? (base.unitsPerCase || 1)
         : Math.max(0, parseFloat(qty) || 0);
-      return [...prev, repriceLine(base, { qty: q })];
+      return applyOrderTierPricing([...prev, repriceLine(base, { qty: q })], pricingMap);
     });
     setApproved(false);
   }
@@ -286,10 +313,10 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
       const { display, levels } = buildCatalogDisplay(pmap, details);
       setCatalog(display);
       setPriceLevels(levels);
-      setLines(prev => buildOrderLines(
+      setLines(prev => applyOrderTierPricing(buildOrderLines(
         prev.map(l => ({ item_number: l.item_number, ordered_quantity: l.qty })),
         pmap, details,
-      ));
+      ), pmap));
       setApproved(false);
     } catch (e) {
       toast(`Could not refresh pricing: ${e.message}`, 'error');
