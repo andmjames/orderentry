@@ -110,38 +110,41 @@ function PackingDoc({ data }) {
           </div>
         </div>
       )}
+    </div>
+  );
+}
 
-      {data.nazdar && (
-        <div style={{ breakInside: 'avoid', pageBreakInside: 'avoid', marginTop: 26 }}>
-          <div style={{ border: '1px solid #000', padding: '10px 12px', textAlign: 'center' }}>
-            <span style={{ color: '#c00', fontWeight: 700, fontSize: 16 }}>*{NAZDAR.doNotStack}*</span>
-          </div>
-          <div style={{ border: '1px solid #000', padding: '12px 14px', marginTop: 10 }}>
-            <div style={{ textAlign: 'center', color: '#c00', fontWeight: 700, fontSize: 15, marginBottom: 8 }}>
-              {NAZDAR.barcodesTitle}
-            </div>
-            <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8 }}>{NAZDAR.lotNote}</div>
-            <div style={{ fontSize: 11.5, lineHeight: 2.1, whiteSpace: 'pre' }}>
-              {Array.from({ length: NAZDAR.skidRows }).map((_, i) => (
-                <div key={i}>{NAZDAR.skidLine}</div>
-              ))}
-            </div>
-            <div style={{ marginTop: 16 }}>
-              <div style={{ fontWeight: 700, fontSize: 12, textDecoration: 'underline' }}>{NAZDAR.originTitle}</div>
-              <div style={{ fontSize: 8, lineHeight: 1.4, marginTop: 2 }}>{NAZDAR.originBody}</div>
-              <div style={{ fontSize: 8, lineHeight: 1.4 }}>{NAZDAR.originLocation}</div>
-            </div>
-            <div style={{ marginTop: 12 }}>
-              <div style={{ fontWeight: 700, fontSize: 12, textDecoration: 'underline' }}>{NAZDAR.analysisTitle}</div>
-              <div style={{ fontSize: 8, lineHeight: 1.4, marginTop: 2 }}>{NAZDAR.analysisIntro}</div>
-              <div style={{ fontSize: 7, lineHeight: 1.45, marginTop: 2, textAlign: 'justify' }}>{NAZDAR.analysisBody}</div>
-            </div>
-            <div style={{ marginTop: 16 }}>
-              <img src={SIGNATURE_SRC} alt="Authorized Signature — Andrew James, President, PMI Tape" style={{ width: '3.6in', height: 'auto', display: 'block' }} />
-            </div>
-          </div>
+// ── Nazdar footer (its own page): DO NOT STACK + barcodes + certificates + signature ──
+function NazdarDoc() {
+  return (
+    <div className="packing-list" style={{ width: '7.5in', background: '#fff', color: '#000', fontFamily: 'Arial, Helvetica, sans-serif', margin: '0 auto' }}>
+      <div style={{ border: '1px solid #000', padding: '10px 12px', textAlign: 'center' }}>
+        <span style={{ color: '#c00', fontWeight: 700, fontSize: 16 }}>*{NAZDAR.doNotStack}*</span>
+      </div>
+      <div style={{ border: '1px solid #000', padding: '12px 14px', marginTop: 10 }}>
+        <div style={{ textAlign: 'center', color: '#c00', fontWeight: 700, fontSize: 15, marginBottom: 8 }}>
+          {NAZDAR.barcodesTitle}
         </div>
-      )}
+        <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 8 }}>{NAZDAR.lotNote}</div>
+        <div style={{ fontSize: 11.5, lineHeight: 2.1, whiteSpace: 'pre' }}>
+          {Array.from({ length: NAZDAR.skidRows }).map((_, i) => (
+            <div key={i}>{NAZDAR.skidLine}</div>
+          ))}
+        </div>
+        <div style={{ marginTop: 16 }}>
+          <div style={{ fontWeight: 700, fontSize: 12, textDecoration: 'underline' }}>{NAZDAR.originTitle}</div>
+          <div style={{ fontSize: 8, lineHeight: 1.4, marginTop: 2 }}>{NAZDAR.originBody}</div>
+          <div style={{ fontSize: 8, lineHeight: 1.4 }}>{NAZDAR.originLocation}</div>
+        </div>
+        <div style={{ marginTop: 12 }}>
+          <div style={{ fontWeight: 700, fontSize: 12, textDecoration: 'underline' }}>{NAZDAR.analysisTitle}</div>
+          <div style={{ fontSize: 8, lineHeight: 1.4, marginTop: 2 }}>{NAZDAR.analysisIntro}</div>
+          <div style={{ fontSize: 7, lineHeight: 1.45, marginTop: 2, textAlign: 'justify' }}>{NAZDAR.analysisBody}</div>
+        </div>
+        <div style={{ marginTop: 16 }}>
+          <img src={SIGNATURE_SRC} alt="Authorized Signature — Andrew James, President, PMI Tape" style={{ width: '3.6in', height: 'auto', display: 'block' }} />
+        </div>
+      </div>
     </div>
   );
 }
@@ -280,12 +283,17 @@ function UsmcaDoc({ data }) {
 }
 
 export default function PackingList({ data, onClose }) {
-  // Canada orders print 3 packing lists + 3 USMCA certificates; others print one packing list.
+  // Build the print sheet sequence (each sheet is one full page):
+  //  • Canada: 3 packing lists + 3 USMCA certificates
+  //  • Nazdar: packing list + its footer page
+  //  • otherwise: one packing list
   const printPages = [];
   const packingCopies = data.canada ? 3 : 1;
   for (let i = 0; i < packingCopies; i++) printPages.push(<PackingDoc data={data} key={'p' + i} />);
   if (data.canada) {
     for (let i = 0; i < 3; i++) printPages.push(<UsmcaDoc data={data} key={'u' + i} />);
+  } else if (data.nazdar) {
+    printPages.push(<NazdarDoc key="naz" />);
   }
 
   return ReactDOM.createPortal(
@@ -303,15 +311,16 @@ export default function PackingList({ data, onClose }) {
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
             <button className="btn btn-ghost btn-sm" onClick={onClose}>Close</button>
-            <button className="btn btn-primary" onClick={() => printWithPage('printing-packing', '@page { size: letter; margin: 0.5in; }')}>
+            <button className="btn btn-primary" onClick={() => printWithPage('printing-packing', '@page { size: letter; margin: 0; }')}>
               {data.canada ? 'Print (3 copies + USMCA)' : 'Print Packing List'}
             </button>
           </div>
         </div>
 
-        {/* Screen preview — one packing list (+ one USMCA for Canada). Not printed. */}
+        {/* Screen preview — not printed. */}
         <div className="packing-preview no-print" style={{ padding: 18, background: '#fff', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24 }}>
           <PackingDoc data={data} />
+          {data.nazdar && !data.canada && <NazdarDoc />}
           {data.canada && <UsmcaDoc data={data} />}
         </div>
 

@@ -395,17 +395,22 @@ input[type=number] { -moz-appearance: textfield; appearance: textfield; }
     background: #fff !important;
   }
   html.printing-packing .packing-list {
-    width: 7.5in !important;
+    width: 100% !important;
     padding: 0 !important;
     box-sizing: border-box !important;
     box-shadow: none !important;
   }
-  /* Multi-copy print output: reveal it and break each sheet onto its own page. */
+  /* Multi-copy print output: reveal it; each sheet is one padded page. */
   html.printing-packing .packing-print { display: block !important; }
-  html.printing-packing .pl-sheet { page-break-after: always; break-after: page; }
+  html.printing-packing .pl-sheet {
+    padding: 0.5in !important;
+    box-sizing: border-box !important;
+    page-break-after: always;
+    break-after: page;
+  }
   html.printing-packing .pl-sheet:last-child { page-break-after: auto; break-after: auto; }
   html.printing-packing .usmca-page {
-    width: 7.5in !important;
+    width: 100% !important;
     padding: 0 !important;
     box-sizing: border-box !important;
   }

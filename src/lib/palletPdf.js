@@ -27,7 +27,44 @@ export async function buildPalletLabelsPdf(data) {
     const canvas = renderLabelCanvas(data, i, count, logo);
     doc.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, PW, PH);
   }
+
+  // Adidas Indy: one "STEVE" label per pallet, after the pallet labels.
+  if (data.steve) {
+    for (let i = 1; i <= count; i++) {
+      doc.addPage([PW, PH], 'portrait');
+      const canvas = renderSteveCanvas(data);
+      doc.addImage(canvas.toDataURL('image/jpeg', 0.92), 'JPEG', 0, 0, PW, PH);
+    }
+  }
+
   return doc.output('datauristring').split(',')[1];
+}
+
+// Same rotate-to-portrait approach as the pallet label, drawing the STEVE label.
+function renderSteveCanvas(data) {
+  const cw = Math.round(LH * F); // portrait width  (4")
+  const ch = Math.round(LW * F); // portrait height (6")
+  const canvas = document.createElement('canvas');
+  canvas.width = cw;
+  canvas.height = ch;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = '#fff';
+  ctx.fillRect(0, 0, cw, ch);
+  ctx.translate(cw, 0);
+  ctx.rotate(Math.PI / 2);
+  ctx.scale(F, F);
+  drawSteveLabel(ctx, data);
+  return canvas;
+}
+
+function drawSteveLabel(ctx, data) {
+  ctx.fillStyle = '#000';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = 'bold 86px Arial';
+  ctx.fillText('STEVE', LW / 2, LH / 2 - 22);
+  ctx.font = '26px Arial';
+  ctx.fillText(`PO #  ${data.poNumber || ''}`, LW / 2, LH / 2 + 42);
 }
 
 function renderLabelCanvas(data, idx, total, logo) {

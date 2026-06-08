@@ -372,6 +372,7 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
         invoiceNumber: packing.invoiceNumber,
         shipToLines: shipToLines(selectedAddr?.addr, customer.name),
         palletCount: shipping.pallets,
+        steve: /adidas\s*indy/i.test(customer.name || ''),
       } : null;
       setPalletData(pallet);
 

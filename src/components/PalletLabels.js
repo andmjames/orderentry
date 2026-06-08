@@ -46,6 +46,7 @@ export default function PalletLabels({ data, onClose }) {
         <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '12px 16px', borderBottom: '.5px solid var(--border)', position: 'sticky', top: 0, background: 'var(--bg)', zIndex: 2 }}>
           <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>
             Pallet labels — {count} page{count === 1 ? '' : 's'}
+            {data.steve && <span style={{ fontWeight: 400, color: 'var(--text2)' }}> + {count} Steve label{count === 1 ? '' : 's'}</span>}
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
             <button className="btn btn-ghost btn-sm" onClick={onClose}>Close</button>
@@ -89,6 +90,19 @@ export default function PalletLabels({ data, onClose }) {
                 Pallet {n} of {count}
               </div>
             </div>
+            </div>
+          ))}
+
+          {/* Adidas Indy: one "STEVE" label per pallet, same 4x6 stock as the pallet labels. */}
+          {data.steve && labels.map(n => (
+            <div key={'steve' + n} className="pallet-page">
+              <div
+                className="pallet-label"
+                style={{ width: '6in', height: '4in', boxSizing: 'border-box', background: '#fff', color: '#000', fontFamily: 'Arial, Helvetica, sans-serif', padding: '0.25in', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', border: '1px solid #e5e5e5', overflow: 'hidden' }}
+              >
+                <div style={{ fontSize: 96, fontWeight: 800, letterSpacing: 2, lineHeight: 1 }}>STEVE</div>
+                <div style={{ fontSize: 30, marginTop: 26 }}>PO #&nbsp;&nbsp;{data.poNumber || ''}</div>
+              </div>
             </div>
           ))}
         </div>

@@ -231,7 +231,27 @@ export function computeShipping(customer, totals, methodOverride, poAccounts) {
 
   let account, hasAccount, accountFromPo, freightCharge, chargeBasis;
 
-  if (qualifiesFreeFreight) {
+  // Customer-specific flat shipping rates — these override account, free-freight, and per-lb pricing.
+  const nameKey = String(c.name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+  const isRjHanlon = nameKey.includes('rjhanlon');
+  const isImageTechFlat = nameKey.includes('imagetech');
+  const flatRate = isRjHanlon || isImageTechFlat;
+
+  if (isRjHanlon) {
+    // Always $94, no matter the method, weight, account, or case count.
+    account = '';
+    hasAccount = false;
+    accountFromPo = false;
+    freightCharge = 94;
+    chargeBasis = 'Flat rate — RJ Hanlon ($94)';
+  } else if (isImageTechFlat) {
+    // $120 per pallet, no matter what.
+    account = '';
+    hasAccount = false;
+    accountFromPo = false;
+    freightCharge = 120 * pallets;
+    chargeBasis = `Image Technology rate — $120 × ${pallets} pallet${pallets === 1 ? '' : 's'}`;
+  } else if (qualifiesFreeFreight) {
     account = '';
     hasAccount = false;
     accountFromPo = false;
@@ -264,7 +284,7 @@ export function computeShipping(customer, totals, methodOverride, poAccounts) {
 
   return {
     methodType, shippingMethod, shippingAccount: account, hasAccount, accountFromPo,
-    freeFreight: qualifiesFreeFreight, freeFreightThreshold: freeFreightCases,
+    freeFreight: flatRate ? false : qualifiesFreeFreight, freeFreightThreshold: freeFreightCases,
     pallets, baseWeight: Math.round(baseWeight * 100) / 100, palletWeight,
     weight, freightCharge, chargeBasis,
   };
