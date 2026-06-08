@@ -348,6 +348,7 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
         })),
         note: /ryonet/i.test(customer.name || '') ? '**Barcodes on all Rolls and Cartons**' : '',
         nazdar: /nazdar/i.test(customer.name || ''),
+        imageTech: /image\s*tech/i.test(customer.name || ''),
       };
       setPackingData(packing);
 

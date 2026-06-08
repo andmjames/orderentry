@@ -6,6 +6,19 @@ export function isNazdar(name) {
   return /nazdar/i.test(String(name || ''));
 }
 
+export function isImageTech(name) {
+  return /image\s*tech/i.test(String(name || ''));
+}
+
+// Image Technology: boxed "Do Not Stack" cone/label note.
+export const IMAGE_TECH = {
+  noteLines: [
+    'Apply a "Do Not Stack" Cone to the top of each Pallet',
+    '&',
+    'Apply a "Do Not Stack" Label to the side of each Pallet',
+  ],
+};
+
 export const NAZDAR = {
   doNotStack: 'Use DO NOT STACK Cones on all Pallet Shipments to Nazdar',
 

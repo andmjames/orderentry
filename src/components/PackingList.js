@@ -3,7 +3,7 @@ import ReactDOM from 'react-dom';
 import JsBarcode from 'jsbarcode';
 import { LOGO_SRC } from '../logo';
 import { printWithPage } from '../lib/printUtil';
-import { NAZDAR } from '../lib/nazdar';
+import { NAZDAR, IMAGE_TECH } from '../lib/nazdar';
 import { SIGNATURE_SRC } from '../signature';
 
 export default function PackingList({ data, onClose }) {
@@ -107,6 +107,12 @@ export default function PackingList({ data, onClose }) {
             {data.note && (
               <div style={{ border: '1px solid #000', padding: '14px 12px', textAlign: 'center', fontSize: 16, marginTop: 30 }}>
                 {data.note}
+              </div>
+            )}
+
+            {data.imageTech && (
+              <div style={{ border: '1px solid #000', padding: '14px 18px', textAlign: 'center', fontSize: 14, lineHeight: 2, marginTop: 30, breakInside: 'avoid', pageBreakInside: 'avoid' }}>
+                {IMAGE_TECH.noteLines.map((ln, i) => <div key={i}>{ln}</div>)}
               </div>
             )}
 

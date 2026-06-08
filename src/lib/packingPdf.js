@@ -1,7 +1,7 @@
 import { jsPDF } from 'jspdf';
 import JsBarcode from 'jsbarcode';
 import { LOGO_SRC } from '../logo';
-import { NAZDAR } from './nazdar';
+import { NAZDAR, IMAGE_TECH } from './nazdar';
 import { SIGNATURE_SRC, SIGNATURE_ASPECT } from '../signature';
 
 const fmt = (n) => Number(n || 0).toLocaleString('en-US', { maximumFractionDigits: 2 });
@@ -130,6 +130,23 @@ export function buildPackingPdf(data) {
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(13);
     doc.text(String(data.note), pageW / 2, y + boxH / 2 + 4, { align: 'center' });
+  }
+
+  // Image Technology: boxed "Do Not Stack" cone/label note — Image Technology only.
+  if (data.imageTech) {
+    const lines = IMAGE_TECH.noteLines;
+    const lineH = 15;
+    const boxH = lines.length * lineH + 14;
+    y += 24;
+    if (y + boxH > 762) { doc.addPage(); y = M + 24; }
+    doc.setLineWidth(0.8);
+    doc.setTextColor(0, 0, 0);
+    doc.rect(M, y, right - M, boxH);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(11);
+    let ty = y + 17;
+    lines.forEach(ln => { doc.text(ln, pageW / 2, ty, { align: 'center' }); ty += lineH; });
+    y += boxH;
   }
 
   // Nazdar-specific footer: notes, certificates, signature — Nazdar only.
