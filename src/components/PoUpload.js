@@ -55,8 +55,7 @@ export default function PoUpload({ customers, customersLoading, customersError, 
     if (autoFile && !busy) {
       handleFile(autoFile);
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoFile]);
+  }, [autoFile]); // eslint-disable-line
 
   function onDrop(e) {
     e.preventDefault();
