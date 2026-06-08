@@ -40,7 +40,16 @@ export default function OrderSummary({
 
       <div className="section-body">
         <div className="metric-grid">
-          <Metric label="No. of Cases on Order" value={totals.cases} />
+          <div className="metric">
+            <div className="metric-label">No. of Cases on Order</div>
+            <div className="metric-value">{totals.cases}</div>
+            <div className="metric-label" style={{ marginTop: 12 }}>No. of Cases for Free Freight</div>
+            <div className="metric-value">
+              {shipping.freeFreightThreshold > 0
+                ? shipping.freeFreightThreshold
+                : <span style={{ color: 'var(--text3)', fontWeight: 500, fontSize: 13 }}>—</span>}
+            </div>
+          </div>
           <Metric label="No. of Pallets" value={shipping.pallets} />
 
           {/* Editable Freight Charge — defaults to the calculated value */}

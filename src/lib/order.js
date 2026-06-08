@@ -264,7 +264,7 @@ export function computeShipping(customer, totals, methodOverride, poAccounts) {
 
   return {
     methodType, shippingMethod, shippingAccount: account, hasAccount, accountFromPo,
-    freeFreight: qualifiesFreeFreight,
+    freeFreight: qualifiesFreeFreight, freeFreightThreshold: freeFreightCases,
     pallets, baseWeight: Math.round(baseWeight * 100) / 100, palletWeight,
     weight, freightCharge, chargeBasis,
   };

@@ -10,7 +10,20 @@ function fileToBase64(file) {
   });
 }
 
-const ACCEPT = '.pdf,image/png,image/jpeg,image/webp,image/gif,application/pdf';
+function extToType(name) {
+  const n = String(name || '').toLowerCase();
+  if (n.endsWith('.pdf')) return 'application/pdf';
+  if (n.endsWith('.png')) return 'image/png';
+  if (n.endsWith('.jpg') || n.endsWith('.jpeg')) return 'image/jpeg';
+  if (n.endsWith('.webp')) return 'image/webp';
+  if (n.endsWith('.gif')) return 'image/gif';
+  if (n.endsWith('.eml')) return 'message/rfc822';
+  if (n.endsWith('.html') || n.endsWith('.htm')) return 'text/html';
+  if (n.endsWith('.txt') || n.endsWith('.text')) return 'text/plain';
+  return 'application/octet-stream';
+}
+
+const ACCEPT = '.pdf,.txt,.eml,.html,image/png,image/jpeg,image/webp,image/gif,application/pdf,text/plain,text/html,message/rfc822';
 
 export default function PoUpload({ customers, customersLoading, customersError, onAnalyzed }) {
   const [drag, setDrag] = useState(false);
@@ -22,8 +35,7 @@ export default function PoUpload({ customers, customersLoading, customersError, 
   const inputRef = useRef(null);
 
   const runAnalysis = useCallback(async (file) => {
-    const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
-    const mediaType = isPdf ? 'application/pdf' : (file.type || 'image/png');
+    const mediaType = file.type || extToType(file.name);
     setBusy(true);
     setError(null);
     setStage('Reading file…');
@@ -73,7 +85,7 @@ export default function PoUpload({ customers, customersLoading, customersError, 
         const raw = (poUrl.split('/').pop() || 'purchase-order.pdf').split('?')[0];
         let name = 'purchase-order.pdf';
         try { name = decodeURIComponent(raw) || name; } catch { name = raw || name; }
-        const type = blob.type || (/\.pdf$/i.test(name) ? 'application/pdf' : 'application/octet-stream');
+        const type = blob.type || extToType(name);
         const file = new File([blob], name, { type });
         setFileName(name);
         setPendingFile(file);
@@ -95,8 +107,10 @@ export default function PoUpload({ customers, customersLoading, customersError, 
 
     const isPdf = file.type === 'application/pdf' || /\.pdf$/i.test(file.name);
     const isImg = /^image\//.test(file.type) || /\.(png|jpe?g|webp|gif)$/i.test(file.name);
-    if (!isPdf && !isImg) {
-      setError('Please upload a PDF or image (PNG, JPG, WEBP).');
+    const isText = /^text\//.test(file.type) || file.type === 'message/rfc822'
+      || file.type === 'application/octet-stream' || /\.(txt|text|eml|html?|csv)$/i.test(file.name);
+    if (!isPdf && !isImg && !isText) {
+      setError('Please upload a PDF, image (PNG, JPG, WEBP), or text/email order.');
       return;
     }
 

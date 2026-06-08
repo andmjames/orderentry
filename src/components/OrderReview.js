@@ -381,10 +381,16 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
         // Attach the original uploaded purchase order to the sales order.
         if (poFile && poFile.base64) {
           try {
-            const ext = (poFile.mediaType || '').includes('pdf') ? 'pdf'
-              : (poFile.mediaType || '').includes('png') ? 'png'
-              : (poFile.mediaType || '').includes('webp') ? 'webp'
-              : (poFile.mediaType || '').match(/jpe?g/) ? 'jpg' : 'pdf';
+            const mt = (poFile.mediaType || '').toLowerCase();
+            const ext = mt.includes('pdf') ? 'pdf'
+              : mt.includes('png') ? 'png'
+              : mt.includes('webp') ? 'webp'
+              : mt.includes('gif') ? 'gif'
+              : mt.match(/jpe?g/) ? 'jpg'
+              : mt.includes('html') ? 'html'
+              : mt.includes('rfc822') || mt.includes('eml') ? 'eml'
+              : mt.includes('text') || mt.includes('octet-stream') ? 'txt'
+              : 'pdf';
             await attachSalesOrderFile({
               salesorderId: res.salesorder_id,
               filename: `PO-${packing.invoiceNumber || res.salesorder_id}.${ext}`,
