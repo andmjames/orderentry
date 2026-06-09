@@ -87,8 +87,9 @@ async function getZohoAccessToken() {
   }
 }
 
-async function zohoGet(path) {
-  const token  = await getZohoAccessToken();
+function invalidateToken() { cachedToken = null; tokenExpiry = 0; }
+
+function buildApiUrl(path) {
   const domain = getZohoDomain();
   const orgId  = process.env.ZOHO_ORGANIZATION_ID;
   const sep    = path.includes('?') ? '&' : '?';
@@ -99,13 +100,40 @@ async function zohoGet(path) {
     : domain === 'zoho.com.au' ? 'zohoapis.com.au'
     : domain === 'zohocloud.ca'? 'zohoapis.ca'
     : 'zohoapis.com';
+  return `https://www.${apiDomain}/inventory/v1${path}${sep}organization_id=${orgId}`;
+}
 
-  const url = `https://www.${apiDomain}/inventory/v1${path}${sep}organization_id=${orgId}`;
+// Authenticated request that self-heals a stale/invalid token: on a 401 it drops
+// the cached access token, mints a fresh one, and retries the request exactly once.
+async function authedFetch(method, url, { body, form } = {}) {
+  const buildOpts = (tok) => {
+    const opts = { method, headers: { Authorization: `Zoho-oauthtoken ${tok}` } };
+    if (form) {
+      opts.body = form; // multipart — let fetch set the Content-Type boundary
+    } else if (body !== undefined) {
+      opts.headers['Content-Type'] = 'application/json';
+      opts.body = JSON.stringify(body);
+    }
+    return opts;
+  };
+  let token = await getZohoAccessToken();
+  let res = await fetch(url, buildOpts(token));
+  if (res.status === 401) {
+    // Token was rejected (e.g. a stale cached token after an env/credential change).
+    // Drop it, mint a fresh one, and try once more before giving up.
+    console.warn(`[zoho] 401 on ${method} ${url.replace(process.env.ZOHO_ORGANIZATION_ID || '', '[orgId]')} — refreshing token and retrying once`);
+    invalidateToken();
+    token = await getZohoAccessToken();
+    res = await fetch(url, buildOpts(token));
+  }
+  return res;
+}
+
+async function zohoGet(path) {
+  const orgId = process.env.ZOHO_ORGANIZATION_ID;
+  const url = buildApiUrl(path);
   console.log(`[zoho] GET ${url.replace(orgId, '[orgId]')}`);
-
-  const res = await fetch(url, {
-    headers: { Authorization: `Zoho-oauthtoken ${token}` },
-  });
+  const res = await authedFetch('GET', url);
   if (!res.ok) {
     const grant = process.env.ZOHO_REFRESH_TOKEN ? 'refresh' : 'client_credentials';
     throw new Error(`Zoho GET ${path} [org=${orgId} grant=${grant}] → ${res.status}: ${await res.text()}`);
@@ -114,77 +142,25 @@ async function zohoGet(path) {
 }
 
 async function zohoPut(path, body) {
-  const token  = await getZohoAccessToken();
-  const domain = getZohoDomain();
-  const orgId  = process.env.ZOHO_ORGANIZATION_ID;
-  const sep    = path.includes('?') ? '&' : '?';
-  const apiDomain = domain === 'zoho.com' ? 'zohoapis.com'
-    : domain === 'zoho.eu'     ? 'zohoapis.eu'
-    : domain === 'zoho.in'     ? 'zohoapis.in'
-    : domain === 'zoho.com.au' ? 'zohoapis.com.au'
-    : domain === 'zohocloud.ca'? 'zohoapis.ca'
-    : 'zohoapis.com';
-
-  const url = `https://www.${apiDomain}/inventory/v1${path}${sep}organization_id=${orgId}`;
-  const res = await fetch(url, {
-    method: 'PUT',
-    headers: {
-      Authorization: `Zoho-oauthtoken ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
+  const url = buildApiUrl(path);
+  const res = await authedFetch('PUT', url, { body });
   if (!res.ok) throw new Error(`Zoho PUT ${path} → ${res.status}: ${await res.text()}`);
   return res.json();
 }
 
 async function zohoPost(path, body) {
-  const token  = await getZohoAccessToken();
-  const domain = getZohoDomain();
-  const orgId  = process.env.ZOHO_ORGANIZATION_ID;
-  const sep    = path.includes('?') ? '&' : '?';
-  const apiDomain = domain === 'zoho.com' ? 'zohoapis.com'
-    : domain === 'zoho.eu'     ? 'zohoapis.eu'
-    : domain === 'zoho.in'     ? 'zohoapis.in'
-    : domain === 'zoho.com.au' ? 'zohoapis.com.au'
-    : domain === 'zohocloud.ca'? 'zohoapis.ca'
-    : 'zohoapis.com';
-
-  const url = `https://www.${apiDomain}/inventory/v1${path}${sep}organization_id=${orgId}`;
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      Authorization: `Zoho-oauthtoken ${token}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(body),
-  });
+  const url = buildApiUrl(path);
+  const res = await authedFetch('POST', url, { body });
   const text = await res.text();
   if (!res.ok) throw new Error(`Zoho POST ${path} → ${res.status}: ${text}`);
   try { return JSON.parse(text); } catch { return text; }
 }
 
 async function zohoUpload(path, { fieldName, filename, buffer, contentType }) {
-  const token  = await getZohoAccessToken();
-  const domain = getZohoDomain();
-  const orgId  = process.env.ZOHO_ORGANIZATION_ID;
-  const sep    = path.includes('?') ? '&' : '?';
-  const apiDomain = domain === 'zoho.com' ? 'zohoapis.com'
-    : domain === 'zoho.eu'     ? 'zohoapis.eu'
-    : domain === 'zoho.in'     ? 'zohoapis.in'
-    : domain === 'zoho.com.au' ? 'zohoapis.com.au'
-    : domain === 'zohocloud.ca'? 'zohoapis.ca'
-    : 'zohoapis.com';
-
-  const url = `https://www.${apiDomain}/inventory/v1${path}${sep}organization_id=${orgId}`;
+  const url = buildApiUrl(path);
   const form = new FormData();
   form.append(fieldName, new Blob([buffer], { type: contentType }), filename);
-
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { Authorization: `Zoho-oauthtoken ${token}` },
-    body: form,
-  });
+  const res = await authedFetch('POST', url, { form });
   const text = await res.text();
   if (!res.ok) throw new Error(`Zoho UPLOAD ${path} → ${res.status}: ${text}`);
   try { return JSON.parse(text); } catch { return text; }

@@ -43,6 +43,11 @@ function longDateOrdinal(d = new Date()) {
   return `${months[d.getMonth()]} ${day}${ord}, ${d.getFullYear()}`;
 }
 
+// Today's date as M/D/YYYY (no leading zeros), e.g. "6/9/2026".
+function dateMDY(d = new Date()) {
+  return `${d.getMonth() + 1}/${d.getDate()}/${d.getFullYear()}`;
+}
+
 // Build the display catalog + price-break levels from pricing rows + Zoho item details.
 function buildCatalogDisplay(pmap, details) {
   const detailBySku = new Map(details.map(d => [d.sku, d]));
@@ -193,7 +198,7 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
   const [priceLevels, setPriceLevels] = useState([]);
   const [showPicker, setShowPicker] = useState(false);
   const [showPricingApp, setShowPricingApp] = useState(false);
-  const [poNumber, setPoNumber] = useState(analysis.po_number || '');
+  const [poNumber, setPoNumber] = useState(analysis.po_number || dateMDY());
   const [freightOverride, setFreightOverride] = useState(null); // null = use calculated
   const [poDuplicate, setPoDuplicate] = useState(false);
   const [packingData, setPackingData] = useState(null);
@@ -796,6 +801,11 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
             <div className="field-group">
               <label className="field-label">
                 Customer PO #
+                {!analysis.po_number && poNumber === dateMDY() && (
+                  <span className="badge" style={{ marginLeft: 8, background: '#fef3c7', color: '#92400e', border: '.5px solid #fcd34d', fontWeight: 600 }}>
+                    No PO number found on PO. Defaulting to date.
+                  </span>
+                )}
                 {poDuplicate && (
                   <span style={{ color: 'var(--danger)', fontWeight: 600, marginLeft: 8 }}>
                     Warning: This is a duplicate purchase order.
