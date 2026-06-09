@@ -106,7 +106,10 @@ async function zohoGet(path) {
   const res = await fetch(url, {
     headers: { Authorization: `Zoho-oauthtoken ${token}` },
   });
-  if (!res.ok) throw new Error(`Zoho GET ${path} → ${res.status}: ${await res.text()}`);
+  if (!res.ok) {
+    const grant = process.env.ZOHO_REFRESH_TOKEN ? 'refresh' : 'client_credentials';
+    throw new Error(`Zoho GET ${path} [org=${orgId} grant=${grant}] → ${res.status}: ${await res.text()}`);
+  }
   return res.json();
 }
 
