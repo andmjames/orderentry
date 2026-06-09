@@ -713,7 +713,11 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
                     </span>
                     <button
                       className="btn btn-primary"
-                      onClick={() => { window.location.href = 'https://inventory.zoho.com/app#/salesorders'; }}
+                      onClick={() => {
+                        window.location.href = result.salesorder_id
+                          ? `https://inventory.zoho.com/app#/salesorders/${result.salesorder_id}/edit`
+                          : 'https://inventory.zoho.com/app#/salesorders';
+                      }}
                     >
                       Go to Zoho
                     </button>
