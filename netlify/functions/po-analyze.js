@@ -62,17 +62,21 @@ exports.handler = async (event) => {
       };
     }
 
-    const prompt = `You are an order-entry assistant for a manufacturer. You are reading a customer's Purchase Order (PO) document.
+    const prompt = `You are an order-entry assistant for a manufacturer (PMI Tape / Packaging Materials, Inc.). You are reading an uploaded document that is EITHER a customer's Purchase Order (PO) OR one of our own PMI Tape Sales Orders (a document titled "SALES ORDER" with a "Sales Order #", issued BY us). Detect which it is.
 
-Two tasks:
+Tasks:
+
+0) DETECT DOCUMENT TYPE. If the document is our own PMI Tape "Sales Order" (titled "SALES ORDER", shows "Sales Order #", and PMI Tape / Packaging Materials, Inc. is the issuer/seller), set document_type to "sales_order" and put the Sales Order number in sales_order_number. Otherwise it is a customer purchase order: set document_type to "purchase_order" and sales_order_number to null. On a Sales Order, the "Bill To" name is the customer, the "Ship To" is the destination, the "PO #" is the customer's PO number, and the line items already use OUR exact item numbers.
 
 1) IDENTIFY THE CUSTOMER. Choose the single best match from this exact list of our known customers. You MUST copy the chosen name verbatim from the list (or use null if none is a reasonable match):
 ${JSON.stringify(customerNames, null, 2)}
 
-2) EXTRACT EVERY LINE ITEM exactly as printed on the PO. Do not invent items.
+2) EXTRACT EVERY LINE ITEM exactly as printed. Do not invent items.
 
 Return ONLY a JSON object, no prose, with this shape:
 {
+  "document_type": "<'sales_order' or 'purchase_order'>",
+  "sales_order_number": "<our Sales Order # if document_type is sales_order, else null>",
   "customer_name": "<exact name from the list, or null>",
   "confidence": <number 0-1>,
   "po_number": "<the PO / order number, or null>",
@@ -105,7 +109,8 @@ Notes:
 - If the PO shows quantities only in cases, set unit_of_measure to "Case".
 - Keep numbers numeric (no currency symbols or commas).
 - Be thorough: capture all line items even across multiple pages.
-- Shipping account: if the PO lists a shipping/collect account number, classify it by the shipping method — small-parcel carriers (UPS, FedEx, USPS, anything labeled "Ground" or "Parcel") go in parcel_account_number; freight/LTL/truck carriers go in freight_account_number. If you can't tell which, put it in the one matching the stated method; if there's no method, leave both null.`;
+- Shipping account: if the PO lists a shipping/collect account number, classify it by the shipping method — small-parcel carriers (UPS, FedEx, USPS, anything labeled "Ground" or "Parcel") go in parcel_account_number; freight/LTL/truck carriers go in freight_account_number. If you can't tell which, put it in the one matching the stated method; if there's no method, leave both null.
+- IMPORTANT: We are the manufacturer/supplier "PMI Tape" / "Packaging Materials, Inc" at 525 Herriman Ct, Noblesville, IN 46060. That is OUR address and often appears on the PO as the supplier, bill-to, or vendor. NEVER use it as ship_to. The ship_to is the customer's destination; if the only address you can find is ours, leave ship_to fields null.`;
 
     const payload = {
       model: ANTHROPIC_MODEL,

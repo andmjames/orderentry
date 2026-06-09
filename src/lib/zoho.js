@@ -34,6 +34,11 @@ export async function addCustomerAddress(customerId, address) {
   });
 }
 
+// Looks up an existing sales order's internal id from its number.
+export async function findSalesOrderByNumber(number) {
+  return apiFetch(`/zoho-find-salesorder?number=${encodeURIComponent(number)}`);
+}
+
 // ── Items ────────────────────────────────────────────────────────────────────
 export async function fetchItemDetailsBySku(skus) {
   if (!skus || !skus.length) return [];

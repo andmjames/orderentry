@@ -289,10 +289,108 @@ function UsmcaDoc({ data }) {
   );
 }
 
+// ── One Bill of Lading page (Menards) ──
+function BolDoc({ data }) {
+  const bol = data.bol || {};
+  const lbl = { fontSize: 11, fontWeight: 700, color: '#000' };
+  const val = { fontSize: 12, color: '#000' };
+  const sectionTitle = { fontSize: 18, fontWeight: 400, borderBottom: '1.5px solid #000', paddingBottom: 4, marginBottom: 10 };
+  const th = { fontSize: 11, fontWeight: 700, textAlign: 'left', padding: '0 8px 6px 0', borderBottom: '1px solid #000' };
+  const td = { fontSize: 12, verticalAlign: 'top', padding: '10px 8px 0 0', color: '#000' };
+  const sigCol = { width: '30%' };
+  const sigLine = { borderTop: '1px solid #000', paddingTop: 4, fontSize: 10, color: '#000' };
+
+  return (
+    <div className="packing-list" style={{ width: '7.5in', background: '#fff', color: '#000', fontFamily: 'Arial, Helvetica, sans-serif', margin: '0 auto' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <div>
+          <div style={{ fontSize: 30, fontWeight: 400 }}>Bill of Lading</div>
+          <div style={{ fontSize: 16 }}>Packaging Materials, Inc.</div>
+        </div>
+        <div style={{ fontSize: 11 }}>Page 1 of 1</div>
+      </div>
+
+      {/* Document / carrier */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 26 }}>
+        <div style={{ width: '48%', lineHeight: 2.4 }}>
+          <div><span style={lbl}>Document Date:</span> <span style={val}>{bol.documentDate}</span></div>
+          <div><span style={lbl}>PO #:</span> <span style={val}>{bol.poNumber || '—'}</span></div>
+        </div>
+        <div style={{ width: '48%', lineHeight: 2.4 }}>
+          <div><span style={lbl}>Carrier:</span> <span style={val}>MNS1 Express Inc</span></div>
+          <div><span style={lbl}>Equipment Type:</span> <span style={val}>Drop and Hook Dry Van</span></div>
+        </div>
+      </div>
+
+      {/* Pickup / Dropoff */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 24 }}>
+        <div style={{ width: '48%' }}>
+          <div style={sectionTitle}>Pickup</div>
+          <div style={lbl}>Location</div>
+          <div style={{ ...val, lineHeight: 1.7, marginTop: 6 }}>
+            Packaging Materials, Inc.<br />525 Herriman Ct<br />Noblesville, IN 46060<br />317-773-8915
+          </div>
+          <div style={{ ...val, marginTop: 18 }}>Freight Charges: Prepaid</div>
+        </div>
+        <div style={{ width: '48%' }}>
+          <div style={sectionTitle}>Dropoff</div>
+          <div style={lbl}>Location</div>
+          <div style={{ ...val, lineHeight: 1.7, marginTop: 6 }}>
+            {(bol.dropoffLines || []).map((ln, i) => <div key={i}>{ln}</div>)}
+          </div>
+        </div>
+      </div>
+
+      {/* Customer order */}
+      <div style={{ marginTop: 28 }}>
+        <div style={sectionTitle}>Customer Order</div>
+        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <thead>
+            <tr>
+              <th style={{ ...th, width: '22%' }}>Quantity</th>
+              <th style={{ ...th, width: '30%' }}>Packaging</th>
+              <th style={{ ...th, width: '28%' }}>Commodity</th>
+              <th style={{ ...th, width: '20%' }}>Weight</th>
+            </tr>
+          </thead>
+          <tbody>
+            {(bol.rows || []).map((r, i) => (
+              <tr key={i}>
+                <td style={td}>{r.quantity}</td>
+                <td style={td}>{(r.packaging || []).map((p, j) => <div key={j}>{p}</div>)}</td>
+                <td style={td}>{r.commodity}</td>
+                <td style={td}>{r.weight}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Signatures */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 80 }}>
+        <div style={sigCol}><div style={sigLine}>Shipper Signature</div></div>
+        <div style={sigCol}><div style={sigLine}>Carrier Signature</div></div>
+        <div style={sigCol}><div style={sigLine}>Consignee Signature</div></div>
+      </div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 44 }}>
+        <div style={sigCol}><div style={sigLine}>Date</div></div>
+        <div style={sigCol}><div style={sigLine}>Date</div></div>
+        <div style={sigCol}><div style={sigLine}>Date</div></div>
+      </div>
+      <div style={{ display: 'flex', gap: 24, marginTop: 44 }}>
+        <div style={{ width: '18%' }}><div style={sigLine}>Time in</div></div>
+        <div style={{ width: '18%' }}><div style={sigLine}>Time out</div></div>
+      </div>
+    </div>
+  );
+}
+
 export default function PackingList({ data, onClose }) {
   // Build the print sheet sequence (each sheet is one full page):
   //  • Canada: 3 packing lists + 3 USMCA certificates
   //  • Nazdar: packing list + its footer page
+  //  • Menards: 1 packing list + 3 Bill of Lading copies
   //  • otherwise: one packing list
   const printPages = [];
   const packingCopies = data.canada ? 3 : 1;
@@ -301,6 +399,8 @@ export default function PackingList({ data, onClose }) {
     for (let i = 0; i < 3; i++) printPages.push(<UsmcaDoc data={data} key={'u' + i} />);
   } else if (data.nazdar) {
     printPages.push(<NazdarDoc key="naz" />);
+  } else if (data.menards) {
+    for (let i = 0; i < 3; i++) printPages.push(<BolDoc data={data} key={'b' + i} />);
   }
 
   return ReactDOM.createPortal(
@@ -315,11 +415,12 @@ export default function PackingList({ data, onClose }) {
           <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)' }}>
             Packing List ready
             {data.canada && <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 400, color: 'var(--text2)' }}>· Canada — prints 3 copies + 3 USMCA certificates</span>}
+            {data.menards && <span style={{ marginLeft: 8, fontSize: 12, fontWeight: 400, color: 'var(--text2)' }}>· Menards — prints 1 packing list + 3 BOL copies</span>}
           </div>
           <div style={{ display: 'flex', gap: 10 }}>
             <button className="btn btn-ghost btn-sm" onClick={onClose}>Close</button>
             <button className="btn btn-primary" onClick={() => printWithPage('printing-packing', '@page { size: letter; margin: 0; }')}>
-              {data.canada ? 'Print (3 copies + USMCA)' : 'Print Packing List'}
+              {data.canada ? 'Print (3 copies + USMCA)' : data.menards ? 'Print (packing list + 3 BOL)' : 'Print Packing List'}
             </button>
           </div>
         </div>
@@ -329,6 +430,7 @@ export default function PackingList({ data, onClose }) {
           <PackingDoc data={data} />
           {data.nazdar && !data.canada && <NazdarDoc />}
           {data.canada && <UsmcaDoc data={data} />}
+          {data.menards && <BolDoc data={data} />}
         </div>
 
         {/* Print output — hidden on screen, revealed by the print stylesheet. */}

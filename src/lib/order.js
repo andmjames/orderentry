@@ -155,15 +155,32 @@ export function scoreAddressMatch(po, ex) {
 
 // Build the dropdown options and pick a selection. If no existing address is a
 // close match to the PO ship-to, a new option (from the PO) is added and selected.
+// PMI's own address (Packaging Materials, Inc — 525 Herriman Ct, Noblesville,
+// IN 46060) often appears as the supplier / bill-to on customer POs. We never
+// ship to ourselves, so it must never be used or offered as a shipping address.
+export function isOwnAddress(a) {
+  if (!a) return false;
+  const blob = String([a.attention, a.name, a.address, a.street, a.street2, a.city, a.state, a.zip, a.text]
+    .filter(Boolean).join(' ')).toLowerCase().replace(/[^a-z0-9]/g, '');
+  if (!blob) return false;
+  if (blob.includes('525herriman')) return true;                       // street
+  if (blob.includes('herriman') && blob.includes('46060')) return true; // street + zip
+  if (blob.includes('packagingmaterials') && blob.includes('herriman')) return true; // company + street
+  return false;
+}
+
 export function pickShippingAddress(poAddr, existing) {
-  const list = (existing || []).map((a, i) => ({
+  const list = (existing || [])
+    .filter(a => !isOwnAddress(a)) // never offer our own address
+    .map((a, i) => ({
     id: a.address_id || `ex-${i}`,
     label: formatAddress(a),
     addr: a,
     isNew: false,
   }));
 
-  const hasPo = poAddr && (poAddr.address || poAddr.street || poAddr.city || poAddr.zip || poAddr.text);
+  // Ignore a PO "ship to" that is actually our own address — we don't ship to ourselves.
+  const hasPo = poAddr && !isOwnAddress(poAddr) && (poAddr.address || poAddr.street || poAddr.city || poAddr.zip || poAddr.text);
   if (!hasPo) return { options: list, selectedId: list[0]?.id || '', matchedExisting: null, score: 0 };
 
   let best = null, bestScore = 0;

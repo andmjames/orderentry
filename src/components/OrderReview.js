@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { fetchCustomer, fetchItemDetailsBySku, matchOrder, createSalesOrder, checkDuplicatePo, attachSalesOrderPdf, attachSalesOrderFile, addCustomerAddress } from '../lib/zoho';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { fetchCustomer, fetchItemDetailsBySku, matchOrder, createSalesOrder, checkDuplicatePo, attachSalesOrderPdf, attachSalesOrderFile, addCustomerAddress, findSalesOrderByNumber } from '../lib/zoho';
 import { fetchCustomerPricing } from '../lib/supabase';
 import { buildPackingPdf } from '../lib/packingPdf';
 import { buildPalletLabelsPdf } from '../lib/palletPdf';
@@ -31,6 +31,16 @@ function shipToLines(addr, fallbackName) {
   if (cityLine) lines.push(cityLine);
   if (addr.country) lines.push(normalizeCountry(addr.country));
   return lines;
+}
+
+// Long date with ordinal, e.g. "March 23rd, 2026" — used as the BOL document date.
+function longDateOrdinal(d = new Date()) {
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const day = d.getDate();
+  const ones = day % 10, tens = day % 100;
+  const ord = (tens >= 11 && tens <= 13) ? 'th'
+    : ones === 1 ? 'st' : ones === 2 ? 'nd' : ones === 3 ? 'rd' : 'th';
+  return `${months[d.getMonth()]} ${day}${ord}, ${d.getFullYear()}`;
 }
 
 // Build the display catalog + price-break levels from pricing rows + Zoho item details.
@@ -78,6 +88,87 @@ function applyOrderTierPricing(lines, pmap) {
   });
 }
 
+// Build the packing-list and pallet-label data objects. Shared by the new-order
+// flow and the Sales Order reprint flow so both produce identical documents
+// (same special notes, same BOL, same format).
+function buildDocs({ customer, shipping, totals, poNumber, invoiceNumber, shipAddr, docLines }) {
+  // One USMCA row per unique item.
+  const seen = new Set();
+  const usmcaItems = [];
+  docLines.forEach(l => {
+    if (!seen.has(l.item_number)) {
+      seen.add(l.item_number);
+      usmcaItems.push({ item_number: l.item_number, description: l.description || '' });
+    }
+  });
+
+  const shipCountry = String(shipAddr?.country || '').trim();
+  const shipsToCanada = /canada/i.test(shipCountry) || /^ca$/i.test(shipCountry);
+  const menards = /menard/i.test(customer.name || '');
+  const plural = (u) => { const s = u || 'Roll'; return /s$/i.test(s) ? s : s + 's'; };
+
+  const bolDropoff = (() => {
+    const a = shipAddr || {};
+    const ls = shipToLines(a, customer.name);
+    if (a.phone) ls.push(String(a.phone));
+    return ls;
+  })();
+  const bolRows = docLines.map(l => {
+    const isFlo = /^\s*flo2730\s*$/i.test(l.item_number || '');
+    const cases = num(l.cases) || 0;
+    const cpp = isFlo ? 108 : (num(l.casesPerPallet) || 0);
+    const linePallets = cpp > 0 ? Math.ceil(cases / cpp) : 0;
+    const pkg = [];
+    if (isFlo) {
+      pkg.push('12 Rolls/Case', '108 Cases/Pallet');
+    } else {
+      if (num(l.unitsPerCase) > 0) pkg.push(`${num(l.unitsPerCase)} ${plural(l.unit)}/Case`);
+      if (num(l.casesPerPallet) > 0) pkg.push(`${num(l.casesPerPallet)} Cases/Pallet`);
+    }
+    if (linePallets > 0) pkg.push(`${linePallets} Pallet${linePallets === 1 ? '' : 's'}`);
+    const qtyNum = num(l.qty) || 0;
+    const lineWeight = Math.round(cases * (num(l.weightPerCase) || 0));
+    return {
+      quantity: `${qtyNum.toLocaleString('en-US')} ${qtyNum === 1 ? (l.unit || 'Roll') : plural(l.unit)}`,
+      packaging: pkg,
+      commodity: isFlo ? 'SKU 7091055' : (l.item_number || ''),
+      weight: lineWeight > 0 ? `${lineWeight.toLocaleString('en-US')} LBS` : '',
+    };
+  });
+
+  const packing = {
+    customerName: customer.name,
+    shipTo: shipAddr ? formatAddress(shipAddr) : '',
+    invoiceNumber: invoiceNumber || '',
+    poNumber,
+    totals: { cases: totals.cases, pallets: shipping.pallets, weight: shipping.weight },
+    palletDimensions: shipping.palletDimensions || '',
+    lines: docLines.map(l => ({
+      qty: l.qty, unit: l.unit, cases: l.cases,
+      item_number: l.item_number, description: l.description,
+    })),
+    note: /ryonet/i.test(customer.name || '') ? '**Barcodes on all Rolls and Cartons**' : '',
+    nazdar: /nazdar/i.test(customer.name || ''),
+    imageTech: /image\s*tech/i.test(customer.name || ''),
+    plasticPallets: isPlasticPalletCustomer(customer.name) && shipping.pallets > 0,
+    canada: shipsToCanada,
+    importerLines: shipToLines(shipAddr, customer.name),
+    usmcaItems,
+    menards,
+    bol: menards ? { documentDate: longDateOrdinal(), poNumber, dropoffLines: bolDropoff, rows: bolRows } : null,
+  };
+
+  const pallet = (shipping.methodType === 'freight' && shipping.pallets > 0) ? {
+    poNumber,
+    invoiceNumber: packing.invoiceNumber,
+    shipToLines: shipToLines(shipAddr, customer.name),
+    palletCount: shipping.pallets,
+    steve: /adidas\s*indy/i.test(customer.name || ''),
+  } : null;
+
+  return { packing, pallet };
+}
+
 export default function OrderReview({ analysis, fileName, poFile, customers, onBack }) {
   const toast = useToast();
 
@@ -120,7 +211,15 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
   const [sending, setSending] = useState(false);
   const [result, setResult] = useState(null);
 
+  // Sales Order reprint mode: the upload is one of our own Sales Orders, not a
+  // new customer PO. We rebuild the packing list + labels and attach them to the
+  // existing SO instead of creating a new order.
+  const salesOrderMode = analysis.document_type === 'sales_order';
+  const [soInfo, setSoInfo] = useState(null);  // { number, id }
+  const soStarted = useRef(false);
+
   const load = useCallback(async (id) => {
+    if (salesOrderMode) return; // handled by the Sales Order effect
     if (!id) { setCustomer(null); setLines([]); setExcluded([]); return; }
     setLoading(true); setError(null); setResult(null); setApproved(false);
     setMethodOverride(null); setShowPicker(false); setFreightOverride(null);
@@ -182,14 +281,14 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
     } finally {
       setLoading(false);
     }
-  }, [analysis]);
+  }, [analysis, salesOrderMode]);
 
   useEffect(() => { load(customerId); }, [customerId, load]);
 
   // Warn if this PO number already exists for this customer in Zoho (debounced).
   useEffect(() => {
     setPoDuplicate(false);
-    if (!customerId || !poNumber.trim()) return;
+    if (salesOrderMode || !customerId || !poNumber.trim()) return;
     let ignore = false;
     const t = setTimeout(() => {
       checkDuplicatePo({ customerId, poNumber: poNumber.trim() })
@@ -197,7 +296,121 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
         .catch(() => { if (!ignore) setPoDuplicate(false); });
     }, 600);
     return () => { ignore = true; clearTimeout(t); };
-  }, [customerId, poNumber]);
+  }, [customerId, poNumber, salesOrderMode]);
+
+  // Sales Order reprint: resolve customer + item details from the uploaded SO,
+  // rebuild the packing list & labels, attach them to the existing SO, and show
+  // the printout. No matching, no new order is created.
+  useEffect(() => {
+    if (!salesOrderMode || soStarted.current) return;
+    soStarted.current = true;
+    (async () => {
+      setLoading(true); setError(null);
+      try {
+        const soNumber = analysis.sales_order_number || analysis.po_number || '';
+        const stub = guessStub || customers.find(
+          c => (c.name || '').toLowerCase() === (analysis.customer_name || '').toLowerCase()
+        );
+        if (!stub) throw new Error(`Customer "${analysis.customer_name || ''}" from the Sales Order was not found in Zoho`);
+
+        const cust = await fetchCustomer(stub.id);
+        setCustomer(cust);
+        setCustomerId(stub.id);
+
+        // Ship-to comes straight from the Sales Order (it may have been edited in Zoho).
+        const a = analysis.ship_to || {};
+        const shipAddr = {
+          attention: a.attention || cust.name,
+          address:   a.address || a.street || '',
+          street2:   a.street2 || '',
+          city:      a.city || '',
+          state:     a.state || '',
+          zip:       a.zip || '',
+          country:   a.country || 'USA',
+          phone:     a.phone || '',
+        };
+        setAddresses([{ id: 'so-shipto', label: formatAddress(shipAddr), addr: shipAddr, isNew: false }]);
+        setSelectedAddrId('so-shipto');
+
+        // Pull item details for the SO's items (our exact item numbers — no matching needed).
+        const items = analysis.line_items || [];
+        const skus = [...new Set(items.map(i => i.identifier).filter(Boolean))];
+        const details = skus.length ? await fetchItemDetailsBySku(skus) : [];
+        const detBySku = new Map(details.map(d => [d.sku, d]));
+
+        const builtLines = items.map(i => {
+          const d = detBySku.get(i.identifier) || {};
+          const upc = num(d.unitsPerCase, 0);
+          const qty = num(i.quantity, 0);
+          return {
+            item_number: i.identifier,
+            item_id: d.id || null,
+            description: i.description || d.description || '',
+            unit: i.unit_of_measure || d.unit || '',
+            qty,
+            cases: upc > 0 ? qty / upc : qty,
+            unitsPerCase: upc,
+            weightPerCase: num(d.weightPerCase, 0),
+            casesPerPallet: num(d.casesPerPallet, 0),
+            unitPrice: num(i.unit_price, null),
+            total: null,
+          };
+        });
+        setLines(builtLines);
+        setItemDetails(details);
+        setPoNumber(analysis.po_number || '');
+
+        // Honor the SO's delivery method when deciding parcel vs freight.
+        const m = String(analysis.shipping_method || '').toLowerCase();
+        const methodForce = /ltl|freight|truck|ftl/.test(m) ? 'freight'
+          : /parcel|ground|ups|fedex|usps/.test(m) ? 'parcel' : null;
+        setMethodOverride(methodForce);
+
+        // Build the documents from the freshly-loaded lines (don't wait on state).
+        const localTotals = computeTotals(builtLines);
+        const localShipping = computeShipping(cust, localTotals, methodForce, {});
+        const { packing, pallet } = buildDocs({
+          customer: cust, shipping: localShipping, totals: localTotals,
+          poNumber: analysis.po_number || '', invoiceNumber: soNumber,
+          shipAddr, docLines: builtLines,
+        });
+        setPackingData(packing);
+        setPalletData(pallet);
+
+        // Find the existing SO so we can attach the regenerated documents.
+        let soId = null;
+        try {
+          const found = await findSalesOrderByNumber(soNumber);
+          soId = found && found.salesorder_id ? found.salesorder_id : null;
+        } catch { /* lookup failed; we'll still show the printout */ }
+        setSoInfo({ number: soNumber, id: soId });
+
+        setShowPacking(true);
+        setLoading(false);
+
+        if (soId) {
+          try {
+            const pdf = buildPackingPdf(packing);
+            await attachSalesOrderPdf({ salesorderId: soId, filename: `Packing-List-${soNumber}.pdf`, pdfBase64: pdf });
+            toast('Packing list attached to the sales order');
+          } catch (e) { toast(`Could not attach packing list: ${e.message}`, 'error'); }
+          if (pallet) {
+            try {
+              const ppdf = await buildPalletLabelsPdf(pallet);
+              await attachSalesOrderPdf({ salesorderId: soId, filename: `Pallet-Labels-${soNumber}.pdf`, pdfBase64: ppdf });
+              toast('Pallet labels attached to the sales order');
+            } catch (e) { toast(`Could not attach pallet labels: ${e.message}`, 'error'); }
+          }
+        } else {
+          toast(`Could not find Sales Order ${soNumber} in Zoho to attach the files`, 'error');
+        }
+      } catch (e) {
+        setError(e.message);
+        setLoading(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [salesOrderMode]);
 
   const currency = customer?.currencyCode || 'USD';
   const totals = computeTotals(lines);
@@ -410,46 +623,14 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
 
       const res = await createSalesOrder(payload);
       setResult(res);
-      // De-duplicate SKUs for the USMCA certificate (one row per unique item).
-      const usmcaSeen = new Set();
-      const usmcaItems = [];
-      sendable.forEach(l => {
-        if (!usmcaSeen.has(l.item_number)) {
-          usmcaSeen.add(l.item_number);
-          usmcaItems.push({ item_number: l.item_number, description: l.description || '' });
-        }
-      });
-      const shipCountry = String(selectedAddr?.addr?.country || '').trim();
-      const shipsToCanada = /canada/i.test(shipCountry) || /^ca$/i.test(shipCountry);
-      const packing = {
-        customerName: customer.name,
-        shipTo: selectedAddr?.addr ? formatAddress(selectedAddr.addr) : '',
-        invoiceNumber: res.salesorder_number || res.salesorder_id || '',
-        poNumber,
-        totals: { cases: totals.cases, pallets: shipping.pallets, weight: shipping.weight },
-        palletDimensions: shipping.palletDimensions || '',
-        lines: sendable.map(l => ({
-          qty: l.qty, unit: l.unit, cases: l.cases,
-          item_number: l.item_number, description: l.description,
-        })),
-        note: /ryonet/i.test(customer.name || '') ? '**Barcodes on all Rolls and Cartons**' : '',
-        nazdar: /nazdar/i.test(customer.name || ''),
-        imageTech: /image\s*tech/i.test(customer.name || ''),
-        plasticPallets: isPlasticPalletCustomer(customer.name) && shipping.pallets > 0,
-        canada: shipsToCanada,
-        importerLines: shipToLines(selectedAddr?.addr, customer.name),
-        usmcaItems,
-      };
-      setPackingData(packing);
 
-      // Pallet labels only when the shipment is going by freight.
-      const pallet = (shipping.methodType === 'freight' && shipping.pallets > 0) ? {
-        poNumber,
-        invoiceNumber: packing.invoiceNumber,
-        shipToLines: shipToLines(selectedAddr?.addr, customer.name),
-        palletCount: shipping.pallets,
-        steve: /adidas\s*indy/i.test(customer.name || ''),
-      } : null;
+      const { packing, pallet } = buildDocs({
+        customer, shipping, totals, poNumber,
+        invoiceNumber: res.salesorder_number || res.salesorder_id || '',
+        shipAddr: selectedAddr?.addr || null,
+        docLines: sendable,
+      });
+      setPackingData(packing);
       setPalletData(pallet);
 
       // If the customer has Remarks, show them first; otherwise go straight to the packing list.
@@ -523,18 +704,71 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
     }
   }
 
+  if (salesOrderMode) {
+    const soNum = soInfo?.number || analysis.sales_order_number || analysis.po_number || '';
+    return (
+      <div>
+        {/* Breadcrumb */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '1.25rem', flexWrap: 'wrap' }}>
+          <button className="btn btn-ghost btn-sm" onClick={onBack} style={{ padding: '5px 10px' }}>← New order</button>
+          <span style={{ color: 'var(--text3)', fontSize: 13 }}>/</span>
+          <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)' }}>Sales Order {soNum}</span>
+          {fileName && <span style={{ fontSize: 12, color: 'var(--text3)' }}>· {fileName}</span>}
+          {loading && <div className="spinner" style={{ marginLeft: 4 }} />}
+        </div>
+
+        {error && (
+          <div className="error-banner" style={{ marginBottom: 16 }}>
+            <strong>Error:</strong> {error}
+          </div>
+        )}
+
+        <div className="section">
+          <div className="section-header">
+            <div className="section-title"><span className="section-title-dot" />Sales Order — Packing List &amp; Labels</div>
+          </div>
+          <div className="section-body">
+            {!packingData && !error && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, color: 'var(--text2)', fontSize: 14 }}>
+                <div className="spinner" /> Rebuilding documents for Sales Order {soNum}…
+              </div>
+            )}
+            {packingData && (
+              <div style={{ fontSize: 14, color: 'var(--text)', lineHeight: 1.7 }}>
+                <div>Documents ready for <strong>Sales Order {soNum}</strong> — {customer?.name}.</div>
+                <div style={{ color: 'var(--text2)', fontSize: 13 }}>
+                  {soInfo?.id
+                    ? 'Packing list' + (palletData ? ' and pallet labels were' : ' was') + ' attached to this sales order in Zoho.'
+                    : 'Couldn\u2019t locate this sales order in Zoho to attach the files — you can still print below.'}
+                </div>
+                <div style={{ display: 'flex', gap: 10, marginTop: 14 }}>
+                  <button className="btn btn-primary" onClick={() => setShowPacking(true)}>
+                    Open Packing List{palletData ? ' & Labels' : ''}
+                  </button>
+                  {palletData && (
+                    <button className="btn btn-ghost" onClick={() => setShowPallet(true)}>Open Pallet Labels</button>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {showPacking && packingData && (
+          <PackingList
+            data={packingData}
+            onClose={() => { setShowPacking(false); if (palletData) setShowPallet(true); }}
+          />
+        )}
+        {showPallet && palletData && (
+          <PalletLabels data={palletData} onClose={() => setShowPallet(false)} />
+        )}
+      </div>
+    );
+  }
+
   return (
     <div>
-      {/* Breadcrumb */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: '1.25rem', flexWrap: 'wrap' }}>
-        <button className="btn btn-ghost btn-sm" onClick={onBack} style={{ padding: '5px 10px' }}>← New order</button>
-        <span style={{ color: 'var(--text3)', fontSize: 13 }}>/</span>
-        <span style={{ fontSize: 14, fontWeight: 500, color: 'var(--text)' }}>Review order</span>
-        {fileName && <span style={{ fontSize: 12, color: 'var(--text3)' }}>· {fileName}</span>}
-        {loading && <div className="spinner" style={{ marginLeft: 4 }} />}
-      </div>
-
-      {/* Customer selection */}
       <div className="section">
         <div className="section-header">
           <div className="section-title"><span className="section-title-dot" />Customer</div>
