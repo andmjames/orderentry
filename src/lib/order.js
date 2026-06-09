@@ -288,11 +288,21 @@ export function computeShipping(customer, totals, methodOverride, poAccounts) {
     ? (c.methodIfFreight || 'LTL')
     : (c.methodIfParcel || 'Parcel');
 
+  // Pallet dimensions (freight only): always 40"x48"xY", where
+  //   Y = ((cases / 48) / pallets) × 60, floored at 19", rounded to whole inches.
+  let palletHeight = null;
+  let palletDimensions = '';
+  if (methodType === 'freight' && pallets > 0) {
+    const rawY = ((totals.cases / 48) / pallets) * 60;
+    palletHeight = Math.max(19, Math.round(rawY));
+    palletDimensions = `40"x48"x${palletHeight}"`;
+  }
+
   return {
     methodType, shippingMethod, shippingAccount: account, hasAccount, accountFromPo,
     freeFreight: flatRate ? false : qualifiesFreeFreight, freeFreightThreshold: freeFreightCases,
     pallets, baseWeight: Math.round(baseWeight * 100) / 100, palletWeight,
-    weight, freightCharge, chargeBasis,
+    weight, freightCharge, chargeBasis, palletHeight, palletDimensions,
   };
 }
 

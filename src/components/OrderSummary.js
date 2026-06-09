@@ -52,7 +52,16 @@ export default function OrderSummary({
                 : <span style={{ color: 'var(--text3)', fontWeight: 500, fontSize: 13 }}>—</span>}
             </div>
           </div>
-          <Metric label="No. of Pallets" value={shipping.pallets} />
+          <div className="metric">
+            <div className="metric-label">No. of Pallets</div>
+            <div className="metric-value">{shipping.pallets}</div>
+            <div className="metric-label" style={{ marginTop: 12 }}>Pallet Dimensions</div>
+            <div className="metric-value">
+              {shipping.palletDimensions
+                ? <span style={{ fontSize: 15 }}>{shipping.palletDimensions}</span>
+                : <span style={{ color: 'var(--text3)', fontWeight: 500, fontSize: 13 }}>—</span>}
+            </div>
+          </div>
 
           {/* Editable Freight Charge — defaults to the calculated value */}
           <div className="metric">

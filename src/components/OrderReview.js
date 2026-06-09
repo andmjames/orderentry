@@ -391,7 +391,7 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
         })),
         shipping_charge: effectiveFreight,
         delivery_method: effectiveMethod || '',
-        comment: `Pallets: ${shipping.pallets} • Weight: ${shipping.weight} lb • Cases: ${totals.cases}${effectiveAccount ? ` • Acct: ${effectiveAccount}` : ''}`,
+        comment: `Pallets: ${shipping.pallets}${shipping.palletDimensions ? ` • Pallet Dimensions: ${shipping.palletDimensions.toUpperCase()}` : ''} • Weight: ${shipping.weight} lb • Cases: ${totals.cases}${effectiveAccount ? ` • Acct: ${effectiveAccount}` : ''}`,
       };
 
       if (selectedAddr?.addr) {
@@ -426,6 +426,7 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
         invoiceNumber: res.salesorder_number || res.salesorder_id || '',
         poNumber,
         totals: { cases: totals.cases, pallets: shipping.pallets, weight: shipping.weight },
+        palletDimensions: shipping.palletDimensions || '',
         lines: sendable.map(l => ({
           qty: l.qty, unit: l.unit, cases: l.cases,
           item_number: l.item_number, description: l.description,

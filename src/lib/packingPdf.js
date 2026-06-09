@@ -91,7 +91,7 @@ export function buildPackingPdf(data) {
     ty += LH;
   };
   totRow('Total Cases', fmt(data.totals.cases));
-  totRow('Total Pallets', fmt(data.totals.pallets));
+  totRow('Total Pallets', `${fmt(data.totals.pallets)}${data.palletDimensions ? ` (${data.palletDimensions})` : ''}`);
   totRow('Total Weight', `${fmt(data.totals.weight)} lbs`);
 
   // ── Items table ──
