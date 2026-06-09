@@ -2,6 +2,7 @@ import { jsPDF } from 'jspdf';
 import JsBarcode from 'jsbarcode';
 import { LOGO_SRC } from '../logo';
 import { NAZDAR, IMAGE_TECH } from './nazdar';
+import { PLASTIC_PALLET_NOTE } from './plasticPallets';
 import { SIGNATURE_SRC, SIGNATURE_ASPECT } from '../signature';
 import { SIGNATURE_MARK_SRC, SIGNATURE_MARK_ASPECT } from '../signatureMark';
 import { CUSTOMS_BOX, USMCA, PMI_PARTY, blanketPeriod, todayMDY } from './canada';
@@ -148,6 +149,20 @@ export function buildPackingPdf(data) {
     doc.setFontSize(11);
     let ty = y + 17;
     lines.forEach(ln => { doc.text(ln, pageW / 2, ty, { align: 'center' }); ty += lineH; });
+    y += boxH;
+  }
+
+  // Plastic-pallet customers shipping on pallets — boxed, centered note.
+  if (data.plasticPallets) {
+    y += 24;
+    const boxH = 30;
+    if (y + boxH > 762) { doc.addPage(); y = M + 24; }
+    doc.setLineWidth(0.8);
+    doc.setTextColor(0, 0, 0);
+    doc.rect(M, y, right - M, boxH);
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(13);
+    doc.text(PLASTIC_PALLET_NOTE, pageW / 2, y + boxH / 2 + 4, { align: 'center' });
     y += boxH;
   }
 

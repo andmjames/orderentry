@@ -8,6 +8,7 @@ import {
   computeTotals, computeShipping, num, money, round2,
   pickShippingAddress, formatAddress, normalizeCountry,
 } from '../lib/order';
+import { isPlasticPalletCustomer } from '../lib/plasticPallets';
 import OrderSummary from './OrderSummary';
 import OrderItemsTable from './OrderItemsTable';
 import AddItemsTable from './AddItemsTable';
@@ -434,6 +435,7 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
         note: /ryonet/i.test(customer.name || '') ? '**Barcodes on all Rolls and Cartons**' : '',
         nazdar: /nazdar/i.test(customer.name || ''),
         imageTech: /image\s*tech/i.test(customer.name || ''),
+        plasticPallets: isPlasticPalletCustomer(customer.name) && shipping.pallets > 0,
         canada: shipsToCanada,
         importerLines: shipToLines(selectedAddr?.addr, customer.name),
         usmcaItems,
