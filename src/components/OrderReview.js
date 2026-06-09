@@ -409,7 +409,6 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
         setLoading(false);
       }
     })();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [salesOrderMode]);
 
   const currency = customer?.currencyCode || 'USD';
