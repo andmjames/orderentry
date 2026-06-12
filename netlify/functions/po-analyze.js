@@ -79,7 +79,7 @@ Return ONLY a JSON object, no prose, with this shape:
   "sales_order_number": "<our Sales Order # if document_type is sales_order, else null>",
   "customer_name": "<exact name from the list, or null>",
   "confidence": <number 0-1>,
-  "po_number": "<the purchase order number exactly as printed, INCLUDING any hyphenated segment or suffix (e.g. '108746-00'). Look for a labeled field such as 'PO #', 'P/O NUMBER', 'Purchase Order', or 'Order Number', often in a boxed header. Use null only if there is genuinely no PO number anywhere>",
+  "po_number": "<the PO / order number, or null>",
   "po_date": "<date on the PO as written, or null>",
   "ship_to": {
     "attention": "<company / contact the order ships to, or null>",
@@ -96,9 +96,8 @@ Return ONLY a JSON object, no prose, with this shape:
   "freight_account_number": "<account number for freight / LTL / truck carriers if the PO lists one, else null>",
   "line_items": [
     {
-      "identifier": "<OUR (the supplier's) item/part number for this line — the one to match against our catalog. Many POs print TWO numbers per line: the customer's own internal part number AND our/vendor number (often under a 'YOUR ITEM NUMBER', 'Vendor Item', 'Supplier Part', or 'Mfr #' column, and frequently starting with 'PMI'). Choose OUR/vendor number (usually the one starting with 'PMI'). If only one number is present, use it>",
-      "customer_identifier": "<the customer's own internal part number for this line if a different second number is also printed (e.g. a code like '355-278-1-RL'), else null>",
-      "description": "<the full item description as printed (may wrap across several printed lines — include all of it), or null>",
+      "identifier": "<the item number / SKU / part code as printed>",
+      "description": "<item description as printed, or null>",
       "quantity": <number as printed>,
       "unit_of_measure": "<e.g. Each, Roll, Case, Sheet, Carton, as printed, or null>",
       "unit_price": <number as printed, or null>
@@ -109,8 +108,7 @@ Return ONLY a JSON object, no prose, with this shape:
 Notes:
 - If the PO shows quantities only in cases, set unit_of_measure to "Case".
 - Keep numbers numeric (no currency symbols or commas).
-- Be thorough: capture EVERY numbered line in the items table (e.g. the 'LINE NO.' column), even when descriptions wrap across multiple printed rows and even across multiple pages. Do not skip lines.
-- DUAL ITEM NUMBERS (important for matching): some POs print both the customer's own part number and our/vendor part number on each line (commonly in columns like 'OUR ITEM NUMBER' = the customer's code, and 'YOUR ITEM NUMBER' = ours, since the PO is written from the customer's perspective). Put OUR/vendor number — typically the one beginning with 'PMI' — in 'identifier', and the customer's own code in 'customer_identifier'. Matching is done on 'identifier', so choosing our number is critical.
+- Be thorough: capture all line items even across multiple pages.
 - Shipping account: if the PO lists a shipping/collect account number, classify it by the shipping method — small-parcel carriers (UPS, FedEx, USPS, anything labeled "Ground" or "Parcel") go in parcel_account_number; freight/LTL/truck carriers go in freight_account_number. If you can't tell which, put it in the one matching the stated method; if there's no method, leave both null.
 - IMPORTANT: We are the manufacturer/supplier "PMI Tape" / "Packaging Materials, Inc" at 525 Herriman Ct, Noblesville, IN 46060. That is OUR address and often appears on the PO as the supplier, bill-to, or vendor. NEVER use it as ship_to. The ship_to is the customer's destination; if the only address you can find is ours, leave ship_to fields null.`;
 

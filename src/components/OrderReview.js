@@ -19,6 +19,21 @@ import { useToast } from './Toast';
 
 const PRICING_APP_URL = process.env.REACT_APP_PRICING_APP_URL || '';
 
+// Zoho item used for the discount adjustment line (the "Duties" non-inventory item,
+// reused as a generic negative-amount line — same item shown on adjustment lines in Zoho).
+const DISCOUNT_ITEM_ID = '2211255000000234247';
+
+// Parse a customer's Discount custom field into a fraction (e.g. "6%" / "6" -> 0.06,
+// "0.06" -> 0.06). Returns 0 when there's no usable discount.
+function discountFraction(raw) {
+  if (raw == null) return 0;
+  const s = String(raw).trim();
+  const n = parseFloat(s.replace(/[^0-9.]/g, ''));
+  if (!isFinite(n) || n <= 0) return 0;
+  const pct = (s.includes('%') || n > 1) ? n : n * 100; // "6%"/"6" -> 6; "0.06" -> 6
+  return pct / 100;
+}
+
 // Break a shipping address into label lines: name, street, street2, "city, ST zip", country.
 function shipToLines(addr, fallbackName) {
   if (!addr) return [fallbackName].filter(Boolean);
@@ -427,6 +442,13 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
   const effectiveMethod  = methodNameOverride != null ? methodNameOverride : (shipping.shippingMethod || '');
   const effectiveAccount = accountOverride != null ? accountOverride : (shipping.shippingAccount || '');
 
+  // Customer discount: a percentage of the product subtotal (freight excluded).
+  // Added to the Zoho SO as a negative line item; never appears on the packing list.
+  const discFrac = discountFraction(customer?.discount);
+  const discountPctLabel = discFrac > 0 ? `${+(discFrac * 100).toFixed(2)}%` : '';
+  const discountAmount = discFrac > 0 ? round2(totals.subtotal * discFrac) : 0;
+  const orderTotal = round2(totals.subtotal + effectiveFreight - discountAmount);
+
   // Hide an "excluded" PO line only once that item is actually in the order
   // (matched, or added via "+ Add Item") — matched by item number/alias.
   // We deliberately do NOT hide just because the item is on the price list:
@@ -611,6 +633,17 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
         delivery_method: effectiveMethod || '',
         comment: `Pallets: ${shipping.pallets}${shipping.palletDimensions ? ` • Pallet Dimensions: ${shipping.palletDimensions.toUpperCase()}` : ''} • Weight: ${shipping.weight} lb • Cases: ${totals.cases}${effectiveAccount ? ` • Acct: ${effectiveAccount}` : ''}`,
       };
+
+      // Customer discount as a negative line item (excluded from the packing list,
+      // which is built from `sendable`/`docLines` only — not from payload.line_items).
+      if (discountAmount > 0) {
+        payload.line_items.push({
+          item_id: DISCOUNT_ITEM_ID,
+          description: `Customer Discount (${discountPctLabel})`,
+          quantity: 1,
+          rate: -discountAmount,
+        });
+      }
 
       if (selectedAddr?.addr) {
         const a = selectedAddr.addr;
@@ -947,7 +980,12 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
 
               <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
                 <span style={{ fontSize: 13, color: 'var(--text2)' }}>
-                  Total: <strong style={{ color: 'var(--text)' }}>{money(totals.subtotal + effectiveFreight, currency)}</strong>
+                  {discountAmount > 0 && (
+                    <span style={{ marginRight: 10 }}>
+                      Discount ({discountPctLabel}): <strong style={{ color: 'var(--text)' }}>−{money(discountAmount, currency)}</strong>
+                    </span>
+                  )}
+                  Total: <strong style={{ color: 'var(--text)' }}>{money(orderTotal, currency)}</strong>
                 </span>
                 {result ? (
                   <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
