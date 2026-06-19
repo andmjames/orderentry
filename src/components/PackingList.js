@@ -92,7 +92,7 @@ function PackingDoc({ data }) {
         </div>
       )}
 
-      {data.imageTech && (
+      {data.doNotStackNote && (
         <div style={{ border: '1px solid #000', padding: '14px 18px', textAlign: 'center', fontSize: 14, lineHeight: 2, marginTop: 30, breakInside: 'avoid', pageBreakInside: 'avoid' }}>
           {IMAGE_TECH.noteLines.map((ln, i) => <div key={i}>{ln}</div>)}
         </div>

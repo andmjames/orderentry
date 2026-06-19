@@ -135,8 +135,8 @@ export function buildPackingPdf(data) {
     doc.text(String(data.note), pageW / 2, y + boxH / 2 + 4, { align: 'center' });
   }
 
-  // Image Technology: boxed "Do Not Stack" cone/label note — Image Technology only.
-  if (data.imageTech) {
+  // Boxed "Do Not Stack" cone/label note (Image Technology, Screen Printers Resource).
+  if (data.doNotStackNote) {
     const lines = IMAGE_TECH.noteLines;
     const lineH = 15;
     const boxH = lines.length * lineH + 14;

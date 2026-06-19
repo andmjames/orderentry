@@ -38,8 +38,13 @@ function discountFraction(raw) {
 function packingNoteFor(name) {
   const n = name || '';
   if (/ryonet/i.test(n)) return '**Barcodes on all Rolls and Cartons**';
-  if (/screen\s*printers?\s*resource/i.test(n)) return 'Do not stack cones';
   return '';
+}
+
+// Customers that get the boxed "Do Not Stack" cone/label note on packing lists.
+function wantsDoNotStackNote(name) {
+  const n = name || '';
+  return /image\s*tech/i.test(n) || /screen\s*printers?\s*resource/i.test(n);
 }
 
 // Break a shipping address into label lines: name, street, street2, "city, ST zip", country.
@@ -177,7 +182,7 @@ function buildDocs({ customer, shipping, totals, poNumber, invoiceNumber, shipAd
     })),
     note: packingNoteFor(customer.name),
     nazdar: /nazdar/i.test(customer.name || ''),
-    imageTech: /image\s*tech/i.test(customer.name || ''),
+    doNotStackNote: wantsDoNotStackNote(customer.name),
     plasticPallets: isPlasticPalletCustomer(customer.name) && shipping.pallets > 0,
     canada: shipsToCanada,
     importerLines: shipToLines(shipAddr, customer.name),
