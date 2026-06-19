@@ -34,6 +34,14 @@ function discountFraction(raw) {
   return pct / 100;
 }
 
+// Single-line customer-specific packing-list note (boxed/centered on the doc).
+function packingNoteFor(name) {
+  const n = name || '';
+  if (/ryonet/i.test(n)) return '**Barcodes on all Rolls and Cartons**';
+  if (/screen\s*printers?\s*resource/i.test(n)) return 'Do not stack cones';
+  return '';
+}
+
 // Break a shipping address into label lines: name, street, street2, "city, ST zip", country.
 function shipToLines(addr, fallbackName) {
   if (!addr) return [fallbackName].filter(Boolean);
@@ -167,7 +175,7 @@ function buildDocs({ customer, shipping, totals, poNumber, invoiceNumber, shipAd
       qty: l.qty, unit: l.unit, cases: l.cases,
       item_number: l.item_number, description: l.description,
     })),
-    note: /ryonet/i.test(customer.name || '') ? '**Barcodes on all Rolls and Cartons**' : '',
+    note: packingNoteFor(customer.name),
     nazdar: /nazdar/i.test(customer.name || ''),
     imageTech: /image\s*tech/i.test(customer.name || ''),
     plasticPallets: isPlasticPalletCustomer(customer.name) && shipping.pallets > 0,
