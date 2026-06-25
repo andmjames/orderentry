@@ -47,7 +47,7 @@ ${JSON.stringify(catalog, null, 2)}
 PO LINE ITEMS extracted from the customer's purchase order (with their original array index):
 ${JSON.stringify(lineItems.map((li, i) => ({ po_index: i, ...li })), null, 2)}
 
-Match each PO line to AT MOST ONE catalog item_number. Match on our item_number, the customer's alias, OR a clear description match. If a PO line does not clearly correspond to a catalog item, leave it unmatched (do NOT guess).
+Match each PO line to AT MOST ONE catalog item_number. A PO line's 'identifier' is normally OUR item number, and 'customer_identifier' (when present) is the customer's own code. Match using ANY of: PO 'identifier' to catalog item_number, PO 'customer_identifier' to catalog alias, or a clear description match. If a PO line does not clearly correspond to a catalog item, leave it unmatched (do NOT guess).
 
 For every matched line, return ordered_quantity = the number of individual selling units (each / rolls / sheets) ordered for that catalog item. NEVER round to a whole case.
 - If the PO quantity is already stated in individual units, ordered_quantity = that quantity exactly (e.g., 96 rolls stays 96).

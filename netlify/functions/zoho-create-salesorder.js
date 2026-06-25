@@ -39,6 +39,7 @@ exports.handler = async (event) => {
       body.shipping_charge = Number(order.shipping_charge) || 0;
     }
     if (order.delivery_method) body.delivery_method = String(order.delivery_method);
+    if (order.notes) body.notes = String(order.notes);
 
     // Zoho rejects an inline shipping_address on a sales order that serializes to
     // 100+ characters (error code 15). Instead, save the ship-to onto the contact's

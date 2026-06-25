@@ -47,6 +47,18 @@ function wantsDoNotStackNote(name) {
   return /image\s*tech/i.test(n) || /screen\s*printers?\s*resource/i.test(n);
 }
 
+// Build the Customer Notes line for the Zoho SO when a shipping account is used.
+// "123456" + "UPS" -> "UPS Account Number 123456"; an already-descriptive value
+// like "UPS Collect Account 674849" is used as-is to avoid redundancy.
+function shippingAccountNote(method, account) {
+  const acct = String(account || '').trim();
+  if (!acct) return '';
+  const m = String(method || '').trim();
+  const lower = acct.toLowerCase();
+  if (lower.includes('account') || (m && lower.includes(m.toLowerCase()))) return acct;
+  return m ? `${m} Account Number ${acct}` : `Account Number ${acct}`;
+}
+
 // Break a shipping address into label lines: name, street, street2, "city, ST zip", country.
 function shipToLines(addr, fallbackName) {
   if (!addr) return [fallbackName].filter(Boolean);
@@ -644,6 +656,7 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
         })),
         shipping_charge: effectiveFreight,
         delivery_method: effectiveMethod || '',
+        notes: shippingAccountNote(effectiveMethod, effectiveAccount),
         comment: `Pallets: ${shipping.pallets}${shipping.palletDimensions ? ` • Pallet Dimensions: ${shipping.palletDimensions.toUpperCase()}` : ''} • Weight: ${shipping.weight} lb • Cases: ${totals.cases}${effectiveAccount ? ` • Acct: ${effectiveAccount}` : ''}`,
       };
 
