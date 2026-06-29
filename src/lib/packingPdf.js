@@ -92,8 +92,10 @@ export function buildPackingPdf(data) {
     ty += LH;
   };
   totRow('Total Cases', fmt(data.totals.cases));
-  totRow('Total Pallets', `${fmt(data.totals.pallets)}${data.palletDimensions ? ` (${data.palletDimensions})` : ''}`);
+  totRow('Total Pallets', fmt(data.totals.pallets));
+  if (data.palletDimensions) totRow('Pallet Dimensions', String(data.palletDimensions));
   totRow('Total Weight', `${fmt(data.totals.weight)} lbs`);
+  if (data.shippingAccount) { doc.text(String(data.shippingAccount), totX, ty); ty += LH; }
 
   // ── Items table ──
   let y = Math.max(ly, ty) + 16;

@@ -57,8 +57,14 @@ function PackingDoc({ data }) {
         </div>
         <div style={{ fontSize: 12, lineHeight: 1.9, textAlign: 'left', minWidth: '2.2in' }}>
           <div><span style={{ color: '#555' }}>Total Cases</span>&nbsp;&nbsp;{fmtNum(data.totals.cases)}</div>
-          <div><span style={{ color: '#555' }}>Total Pallets</span>&nbsp;&nbsp;{fmtNum(data.totals.pallets)}{data.palletDimensions ? ` (${data.palletDimensions})` : ''}</div>
+          <div><span style={{ color: '#555' }}>Total Pallets</span>&nbsp;&nbsp;{fmtNum(data.totals.pallets)}</div>
+          {data.palletDimensions && (
+            <div><span style={{ color: '#555' }}>Pallet Dimensions</span>&nbsp;&nbsp;{data.palletDimensions}</div>
+          )}
           <div><span style={{ color: '#555' }}>Total Weight</span>&nbsp;&nbsp;{fmtNum(data.totals.weight)} <span style={{ color: '#555' }}>lbs</span></div>
+          {data.shippingAccount && (
+            <div>{data.shippingAccount}</div>
+          )}
         </div>
       </div>
 

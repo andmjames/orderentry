@@ -136,7 +136,7 @@ function applyOrderTierPricing(lines, pmap) {
 // Build the packing-list and pallet-label data objects. Shared by the new-order
 // flow and the Sales Order reprint flow so both produce identical documents
 // (same special notes, same BOL, same format).
-function buildDocs({ customer, shipping, totals, poNumber, invoiceNumber, shipAddr, docLines }) {
+function buildDocs({ customer, shipping, totals, poNumber, invoiceNumber, shipAddr, docLines, accountNote }) {
   // One USMCA row per unique item.
   const seen = new Set();
   const usmcaItems = [];
@@ -188,6 +188,7 @@ function buildDocs({ customer, shipping, totals, poNumber, invoiceNumber, shipAd
     poNumber,
     totals: { cases: totals.cases, pallets: shipping.pallets, weight: shipping.weight },
     palletDimensions: shipping.palletDimensions || '',
+    shippingAccount: accountNote || '',
     lines: docLines.map(l => ({
       qty: l.qty, unit: l.unit, cases: l.cases,
       item_number: l.item_number, description: l.description,
@@ -418,6 +419,7 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
           customer: cust, shipping: localShipping, totals: localTotals,
           poNumber: analysis.po_number || '', invoiceNumber: soNumber,
           shipAddr, docLines: builtLines,
+          accountNote: shippingAccountNote(localShipping.shippingMethod, localShipping.shippingAccount),
         });
         setPackingData(packing);
         setPalletData(pallet);
@@ -692,6 +694,7 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
         invoiceNumber: res.salesorder_number || res.salesorder_id || '',
         shipAddr: selectedAddr?.addr || null,
         docLines: sendable,
+        accountNote: shippingAccountNote(effectiveMethod, effectiveAccount),
       });
       setPackingData(packing);
       setPalletData(pallet);
