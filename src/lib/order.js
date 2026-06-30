@@ -305,13 +305,15 @@ export function computeShipping(customer, totals, methodOverride, poAccounts) {
     ? (c.methodIfFreight || 'LTL')
     : (c.methodIfParcel || 'Parcel');
 
-  // Pallet dimensions (freight only): always 40"x48"xY", where
-  //   Y = ((cases / 48) / pallets) × 60, floored at 19", rounded to whole inches.
+  // Pallet dimensions (freight only): always 40"x48"xY". The product is spread evenly
+  // across the (rounded-up) pallet count, so each pallet's height reflects its share:
+  //   Y = (palletFraction / pallets) × 60, clamped to 19"–60", rounded to whole inches.
+  // e.g. 1.7 pallets of product over 2 pallets → (1.7 / 2) × 60 = 51".
   let palletHeight = null;
   let palletDimensions = '';
   if (methodType === 'freight' && pallets > 0) {
-    const rawY = ((totals.cases / 48) / pallets) * 60;
-    palletHeight = Math.max(19, Math.round(rawY));
+    const perPallet = totals.palletFraction > 0 ? (totals.palletFraction / pallets) : 1;
+    palletHeight = Math.min(60, Math.max(19, Math.round(perPallet * 60)));
     palletDimensions = `40"x48"x${palletHeight}"`;
   }
 
