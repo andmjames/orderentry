@@ -14,11 +14,34 @@ exports.handler = async (event) => {
     const data    = await zohoGet(`/contacts/${id}`);
     const contact = data.contact;
 
+    // Zoho stores a contact's primary shipping/billing addresses separately from the
+    // `addresses` array (which holds only ADDITIONAL addresses). Include the primary
+    // shipping address as a selectable option, plus any additional shipping addresses,
+    // and fall back to the billing address if there's no shipping address at all.
+    const hasAddr = a => a && (a.address || a.street2 || a.city || a.zip || a.attention);
+    const primaryShip = contact.shipping_address || {};
+    const primaryBill = contact.billing_address || {};
+    const addrCandidates = [];
+    if (hasAddr(primaryShip)) addrCandidates.push({ ...primaryShip, address_id: primaryShip.address_id || 'primary-shipping' });
+    for (const a of (contact.addresses || [])) {
+      if ((!a.address_type || a.address_type === 'shipping') && hasAddr(a)) addrCandidates.push(a);
+    }
+    if (addrCandidates.length === 0 && hasAddr(primaryBill)) {
+      addrCandidates.push({ ...primaryBill, address_id: primaryBill.address_id || 'primary-billing' });
+    }
+    const seenAddr = new Set();
+    const shippingAddresses = addrCandidates.filter(a => {
+      const k = a.address_id || `${a.address || ''}|${a.zip || ''}`;
+      if (seenAddr.has(k)) return false;
+      seenAddr.add(k);
+      return true;
+    });
+
     const customer = {
       id:                 contact.contact_id,
       name:               contact.contact_name,
       paymentTerms:       contact.payment_terms_label || contact.payment_terms || '',
-      shippingAddresses:  (contact.addresses || []).filter(a => !a.address_type || a.address_type === 'shipping'),
+      shippingAddresses,
       billingAddress:     contact.billing_address || {},
       casesForFreeFreight: cf(contact, 'Cases for Free Freight'),
       methodIfFreight:    cf(contact, 'Method if Freight'),
