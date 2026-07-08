@@ -133,6 +133,19 @@ function applyOrderTierPricing(lines, pmap) {
   });
 }
 
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+
+// Retry a flaky async op (e.g. a Zoho attachment upload) a few times with backoff.
+// Handles transient failures like rate-limits or a sales order that was just created.
+async function withRetry(fn, tries = 3, baseMs = 800) {
+  let lastErr;
+  for (let i = 0; i < tries; i++) {
+    try { return await fn(); }
+    catch (e) { lastErr = e; if (i < tries - 1) await sleep(baseMs * (i + 1)); }
+  }
+  throw lastErr;
+}
+
 // Build the packing-list and pallet-label data objects. Shared by the new-order
 // flow and the Sales Order reprint flow so both produce identical documents
 // (same special notes, same BOL, same format).
@@ -436,15 +449,16 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
         setLoading(false);
 
         if (soId) {
+          await sleep(700);
           try {
             const pdf = buildPackingPdf(packing);
-            await attachSalesOrderPdf({ salesorderId: soId, filename: `Packing-List-${soNumber}.pdf`, pdfBase64: pdf });
+            await withRetry(() => attachSalesOrderPdf({ salesorderId: soId, filename: `Packing-List-${soNumber}.pdf`, pdfBase64: pdf }));
             toast('Packing list attached to the sales order');
           } catch (e) { toast(`Could not attach packing list: ${e.message}`, 'error'); }
           if (pallet) {
             try {
               const ppdf = await buildPalletLabelsPdf(pallet);
-              await attachSalesOrderPdf({ salesorderId: soId, filename: `Pallet-Labels-${soNumber}.pdf`, pdfBase64: ppdf });
+              await withRetry(() => attachSalesOrderPdf({ salesorderId: soId, filename: `Pallet-Labels-${soNumber}.pdf`, pdfBase64: ppdf }));
               toast('Pallet labels attached to the sales order');
             } catch (e) { toast(`Could not attach pallet labels: ${e.message}`, 'error'); }
           }
@@ -711,13 +725,16 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
 
       // Generate the packing list PDF and attach it to the sales order in Zoho.
       if (res.salesorder_id) {
+        // Give Zoho a moment to finish committing the just-created SO before
+        // attaching, then retry each upload to ride out transient failures.
+        await sleep(700);
         try {
           const pdfBase64 = buildPackingPdf(packing);
-          await attachSalesOrderPdf({
+          await withRetry(() => attachSalesOrderPdf({
             salesorderId: res.salesorder_id,
             filename: `Packing-List-${packing.invoiceNumber || res.salesorder_id}.pdf`,
             pdfBase64,
-          });
+          }));
           toast('Packing list attached to the sales order');
         } catch (e) {
           toast(`Could not attach packing list: ${e.message}`, 'error');
@@ -736,12 +753,12 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
               : mt.includes('rfc822') || mt.includes('eml') ? 'eml'
               : mt.includes('text') || mt.includes('octet-stream') ? 'txt'
               : 'pdf';
-            await attachSalesOrderFile({
+            await withRetry(() => attachSalesOrderFile({
               salesorderId: res.salesorder_id,
               filename: `PO-${packing.invoiceNumber || res.salesorder_id}.${ext}`,
               fileBase64: poFile.base64,
               contentType: poFile.mediaType || 'application/pdf',
-            });
+            }));
             toast('Purchase order attached to the sales order');
           } catch (e) {
             toast(`Could not attach purchase order: ${e.message}`, 'error');
@@ -752,11 +769,11 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
         if (pallet) {
           try {
             const palletPdf = await buildPalletLabelsPdf(pallet);
-            await attachSalesOrderPdf({
+            await withRetry(() => attachSalesOrderPdf({
               salesorderId: res.salesorder_id,
               filename: `Pallet-Labels-${pallet.invoiceNumber || res.salesorder_id}.pdf`,
               pdfBase64: palletPdf,
-            });
+            }));
             toast('Pallet labels attached to the sales order');
           } catch (e) {
             toast(`Could not attach pallet labels: ${e.message}`, 'error');
