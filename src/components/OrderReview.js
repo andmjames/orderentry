@@ -262,6 +262,7 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
   const [showRemarks, setShowRemarks] = useState(false);
   const [excluded, setExcluded] = useState([]);
   const [methodOverride, setMethodOverride] = useState(null);
+  const [palletsOverride, setPalletsOverride] = useState(null); // null = use calculated
   const [methodNameOverride, setMethodNameOverride] = useState(null); // manual carrier/method text
   const [accountOverride, setAccountOverride] = useState(null);       // manual shipping account #
   const [loading, setLoading] = useState(false);
@@ -282,7 +283,7 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
     if (!id) { setCustomer(null); setLines([]); setExcluded([]); return; }
     setLoading(true); setError(null); setResult(null); setApproved(false);
     setMethodOverride(null); setShowPicker(false); setFreightOverride(null);
-    setMethodNameOverride(null); setAccountOverride(null);
+    setMethodNameOverride(null); setAccountOverride(null); setPalletsOverride(null);
     setPalletData(null); setShowPallet(false); setShowRemarks(false);
     try {
       const cust = await fetchCustomer(id);
@@ -478,7 +479,7 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
     parcel:  analysis.parcel_account_number || '',
     freight: analysis.freight_account_number || '',
   };
-  const shipping = computeShipping(customer, totals, methodOverride, poAccounts);
+  const shipping = computeShipping(customer, totals, methodOverride, poAccounts, palletsOverride);
   const effectiveFreight = freightOverride != null ? freightOverride : shipping.freightCharge;
   const effectiveMethod  = methodNameOverride != null ? methodNameOverride : (shipping.shippingMethod || '');
   const effectiveAccount = accountOverride != null ? accountOverride : (shipping.shippingAccount || '');
@@ -989,6 +990,10 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
             accountOverridden={accountOverride != null}
             onAccountChange={(v) => setAccountOverride(v)}
             onAccountReset={() => setAccountOverride(null)}
+            palletsValue={shipping.pallets}
+            palletsOverridden={palletsOverride != null}
+            onPalletsChange={(v) => setPalletsOverride(v)}
+            onPalletsReset={() => setPalletsOverride(null)}
           />
           <OrderItemsTable
             lines={lines}

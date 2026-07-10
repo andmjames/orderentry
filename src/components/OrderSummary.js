@@ -17,6 +17,7 @@ export default function OrderSummary({
   freightValue, freightCalculated, freightOverridden, onFreightChange, onFreightReset,
   methodValue, methodOverridden, onMethodNameChange, onMethodNameReset,
   accountValue, accountOverridden, onAccountChange, onAccountReset,
+  palletsValue, palletsOverridden, onPalletsChange, onPalletsReset,
 }) {
   return (
     <div className="section">
@@ -54,7 +55,27 @@ export default function OrderSummary({
           </div>
           <div className="metric">
             <div className="metric-label">No. of Pallets</div>
-            <div className="metric-value">{shipping.pallets}</div>
+            {shipping.methodType === 'freight' ? (
+              <>
+                <div className="metric-value">
+                  <input
+                    className="ot-edit"
+                    type="number" min="0" step="1"
+                    style={{ width: 70, textAlign: 'left', fontSize: 18, fontWeight: 600, padding: '2px 4px' }}
+                    value={palletsValue}
+                    onChange={e => onPalletsChange(e.target.value === '' ? 0 : Math.max(0, parseInt(e.target.value, 10) || 0))}
+                  />
+                </div>
+                {palletsOverridden && (
+                  <div style={{ fontSize: 10.5, color: 'var(--text3)', marginTop: 3 }}>
+                    manual · calc {shipping.palletsCalculated} ·{' '}
+                    <span onClick={onPalletsReset} style={{ color: 'var(--text2)', textDecoration: 'underline', cursor: 'pointer' }}>reset</span>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="metric-value">{shipping.pallets}</div>
+            )}
             <div className="metric-label" style={{ marginTop: 12 }}>Pallet Dimensions</div>
             <div className="metric-value">
               {shipping.palletDimensions

@@ -217,7 +217,7 @@ export function pickShippingAddress(poAddr, existing) {
 const FREIGHT_WEIGHT_THRESHOLD = 160; // >= 160 lb (product weight) → freight, else parcel
 const PALLET_WEIGHT_LB = 40;          // freight adds 40 lb per pallet
 
-export function computeShipping(customer, totals, methodOverride, poAccounts) {
+export function computeShipping(customer, totals, methodOverride, poAccounts, palletsOverride) {
   const c = customer || {};
   const po = poAccounts || {};
   const parcelPerLb  = num(c.parcelPricePerLb, 0);
@@ -228,12 +228,19 @@ export function computeShipping(customer, totals, methodOverride, poAccounts) {
   const methodType = methodOverride || (baseWeight >= FREIGHT_WEIGHT_THRESHOLD ? 'freight' : 'parcel');
 
   // Pallets: parcel = 0; freight = ceil( Σ cases / cases-per-pallet ).
+  // A manual override (when provided) wins for freight shipments.
   let pallets = 0;
   if (methodType === 'freight') {
     pallets = totals.palletFraction > 0
       ? Math.ceil(totals.palletFraction)
       : (totals.cases > 0 ? 1 : 0);
+    if (palletsOverride != null && isFinite(palletsOverride) && palletsOverride >= 0) {
+      pallets = Math.floor(palletsOverride);
+    }
   }
+  const palletsCalculated = methodType === 'freight'
+    ? (totals.palletFraction > 0 ? Math.ceil(totals.palletFraction) : (totals.cases > 0 ? 1 : 0))
+    : 0;
 
   // Freight adds 40 lb per pallet to the shipment weight.
   const palletWeight = methodType === 'freight' ? pallets * PALLET_WEIGHT_LB : 0;
@@ -320,7 +327,7 @@ export function computeShipping(customer, totals, methodOverride, poAccounts) {
   return {
     methodType, shippingMethod, shippingAccount: account, hasAccount, accountFromPo,
     freeFreight: flatRate ? false : qualifiesFreeFreight, freeFreightThreshold: freeFreightCases,
-    pallets, baseWeight: Math.round(baseWeight * 100) / 100, palletWeight,
+    pallets, palletsCalculated, baseWeight: Math.round(baseWeight * 100) / 100, palletWeight,
     weight, freightCharge, chargeBasis, palletHeight, palletDimensions,
   };
 }
