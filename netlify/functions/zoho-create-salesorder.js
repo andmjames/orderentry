@@ -1,5 +1,5 @@
 // Push an approved order to Zoho Inventory as a Sales Order.
-const { zohoPut, zohoPost, headers, checkEnv } = require('./zoho-utils');
+const { zohoPost, headers, checkEnv } = require('./zoho-utils');
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
@@ -41,13 +41,14 @@ exports.handler = async (event) => {
     if (order.delivery_method) body.delivery_method = String(order.delivery_method);
     if (order.notes) body.notes = String(order.notes);
 
-    // Zoho rejects an inline shipping_address on a sales order that serializes to
-    // 100+ characters (error code 15). Instead, save the ship-to onto the contact's
-    // (singular) shipping_address — which has no such limit — and let the sales order
-    // inherit it. This mirrors the working approach used in the Customer Pricing App.
+    // Ship-to handling — never overwrites the customer's primary address. Send the
+    // address INLINE on the sales order first (no side effects on the contact). Zoho
+    // rejects very long inline addresses (error 15); if that happens, save the ship-to
+    // as an ADDITIONAL address on the contact and reference it by id.
+    let shipAddr = null;
     if (order.shipping_address && typeof order.shipping_address === 'object') {
       const a = order.shipping_address;
-      const shipping_address = {
+      shipAddr = {
         attention: a.attention || '',
         address:   a.address   || '',
         street2:   a.street2   || '',
@@ -56,16 +57,29 @@ exports.handler = async (event) => {
         zip:       a.zip       || '',
         country:   a.country   || 'USA',
         phone:     a.phone     || '',
-        fax:       '',
       };
-      try {
-        await zohoPut(`/contacts/${order.customer_id}`, { shipping_address });
-      } catch (e) {
-        return { statusCode: 502, headers, body: JSON.stringify({ error: `Could not save shipping address to customer: ${e.message}` }) };
-      }
     }
 
-    const result = await zohoPost('/salesorders', body);
+    let result;
+    if (shipAddr) {
+      try {
+        result = await zohoPost('/salesorders', { ...body, shipping_address: shipAddr });
+      } catch (inlineErr) {
+        // Inline rejected (likely too long). Save as an ADDITIONAL contact address and
+        // reference it by id — this does NOT overwrite the customer's primary address.
+        let addressId = null;
+        try {
+          const addRes = await zohoPost(`/contacts/${order.customer_id}/address`, shipAddr);
+          const info = addRes.address_info || addRes.address || {};
+          addressId = info.address_id || addRes.address_id || null;
+        } catch (e) {
+          return { statusCode: 502, headers, body: JSON.stringify({ error: `Could not save shipping address to customer: ${e.message}` }) };
+        }
+        result = await zohoPost('/salesorders', addressId ? { ...body, shipping_address_id: addressId } : body);
+      }
+    } else {
+      result = await zohoPost('/salesorders', body);
+    }
 
     const so = result.salesorder || {};
 
