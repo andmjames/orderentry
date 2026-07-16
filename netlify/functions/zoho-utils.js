@@ -6,6 +6,50 @@ let tokenExpiry = 0;
 
 const _sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
+// Shared token cache (Supabase) — so every (stateless) function instance reuses one
+// access token instead of each minting its own and tripping Zoho's token rate limit.
+// Best-effort: if the Supabase env vars are absent or a call fails, we silently fall
+// back to per-instance minting, so nothing breaks when it isn't configured.
+const SUPABASE_URL = process.env.SUPABASE_URL || '';
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_ANON_KEY || '';
+const TOKEN_CACHE_KEY = 'zoho_order_entry';
+
+async function readSharedToken() {
+  if (!SUPABASE_URL || !SUPABASE_KEY) return null;
+  try {
+    const url = `${SUPABASE_URL}/rest/v1/zoho_token_cache?key=eq.${TOKEN_CACHE_KEY}&select=access_token,expires_at`;
+    const res = await fetch(url, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${SUPABASE_KEY}` } });
+    if (!res.ok) return null;
+    const rows = await res.json().catch(() => []);
+    const row = Array.isArray(rows) ? rows[0] : null;
+    if (!row || !row.access_token || !row.expires_at) return null;
+    const expiryMs = new Date(row.expires_at).getTime();
+    if (!(expiryMs > Date.now() + 30000)) return null; // <30s left → treat as expired
+    return { token: row.access_token, expiryMs };
+  } catch { return null; }
+}
+
+async function writeSharedToken(token, expiryMs) {
+  if (!SUPABASE_URL || !SUPABASE_KEY) return;
+  try {
+    await fetch(`${SUPABASE_URL}/rest/v1/zoho_token_cache?on_conflict=key`, {
+      method: 'POST',
+      headers: {
+        apikey: SUPABASE_KEY,
+        Authorization: `Bearer ${SUPABASE_KEY}`,
+        'Content-Type': 'application/json',
+        Prefer: 'resolution=merge-duplicates',
+      },
+      body: JSON.stringify({
+        key: TOKEN_CACHE_KEY,
+        access_token: token,
+        expires_at: new Date(expiryMs).toISOString(),
+        updated_at: new Date().toISOString(),
+      }),
+    });
+  } catch { /* best-effort */ }
+}
+
 function getZohoDomain() {
   // Set ZOHO_DOMAIN in Netlify env vars if not on US servers, e.g.:
   //   zoho.eu        → EU
@@ -69,12 +113,24 @@ async function requestNewToken() {
   throw new Error(`Failed to get Zoho access token from ${tokenUrl}: ${lastBody}`);
 }
 
-async function getZohoAccessToken() {
-  if (cachedToken && Date.now() < tokenExpiry) return cachedToken;
+async function getZohoAccessToken(forceRefresh = false) {
+  if (!forceRefresh && cachedToken && Date.now() < tokenExpiry) return cachedToken;
+
+  // L2: reuse a token another instance already minted (shared Supabase cache).
+  if (!forceRefresh) {
+    const shared = await readSharedToken();
+    if (shared) {
+      cachedToken = shared.token;
+      tokenExpiry = shared.expiryMs;
+      return cachedToken;
+    }
+  }
+
   try {
     const data = await requestNewToken();
     cachedToken = data.access_token;
     tokenExpiry = Date.now() + ((data.expires_in || 3600) - 60) * 1000;
+    await writeSharedToken(cachedToken, tokenExpiry); // publish for other instances
     return cachedToken;
   } catch (e) {
     // If we still hold a recently-issued token (we expire it 60s early), reuse it
@@ -123,7 +179,7 @@ async function authedFetch(method, url, { body, form } = {}) {
     // Drop it, mint a fresh one, and try once more before giving up.
     console.warn(`[zoho] 401 on ${method} ${url.replace(process.env.ZOHO_ORGANIZATION_ID || '', '[orgId]')} — refreshing token and retrying once`);
     invalidateToken();
-    token = await getZohoAccessToken();
+    token = await getZohoAccessToken(true); // force a fresh mint, bypassing caches
     res = await fetch(url, buildOpts(token));
   }
   return res;

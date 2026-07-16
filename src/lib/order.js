@@ -141,16 +141,38 @@ function addrTokens(a) {
   return new Set(s.split(/\s+/).filter(Boolean));
 }
 
-// 0..1 similarity between a PO ship-to and an existing address (zip match is a strong signal).
+// 0..1 similarity between a PO ship-to and an existing address. The street line is
+// decisive: a shared 5-digit zip is NOT enough on its own (many different businesses
+// share a zip — e.g. a drop-ship destination vs. the customer's own dock), so a match
+// must line up the street number and name.
 export function scoreAddressMatch(po, ex) {
   const A = addrTokens(po), B = addrTokens(ex);
   if (!A.size || !B.size) return 0;
   let inter = 0; A.forEach(t => { if (B.has(t)) inter++; });
   const jacc = inter / (A.size + B.size - inter);
+
+  const normStreet = s => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+  const sp = normStreet(po.address || po.street);
+  const se = normStreet(ex.address || ex.street);
+  const numP = (sp.match(/^\d+/) || [''])[0];
+  const numE = (se.match(/^\d+/) || [''])[0];
+  const streetToks = str => new Set(str.replace(/^\d+\s*/, '').split(' ').filter(Boolean));
+  const tp = streetToks(sp), te = streetToks(se);
+  let sInter = 0; tp.forEach(t => { if (te.has(t)) sInter++; });
+  const streetJacc = (tp.size && te.size) ? sInter / (tp.size + te.size - sInter) : 0;
+  const numMatch = numP && numE && numP === numE;
+
+  let score;
+  if (numMatch && streetJacc >= 0.34) score = 0.95;   // same house number + street name
+  else if (numMatch) score = 0.6;                      // same number, differently-worded street
+  else score = Math.min(jacc, 0.45);                   // no street-number match → cannot be a match
+
+  // A matching zip nudges an already-plausible street match up, but never alone.
   const pz = String(po.zip || '').replace(/\D/g, '').slice(0, 5);
   const ez = String(ex.zip || '').replace(/\D/g, '').slice(0, 5);
-  const zipEq = pz && ez && pz === ez;
-  return zipEq ? Math.max(jacc, 0.6) : jacc;
+  if (pz && ez && pz === ez && score >= 0.5) score = Math.min(1, score + 0.05);
+
+  return score;
 }
 
 // Build the dropdown options and pick a selection. If no existing address is a

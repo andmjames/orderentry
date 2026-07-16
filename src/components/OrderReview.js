@@ -907,7 +907,7 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
                 <span>
                   Shipping Address
                   {addrMatched === true && <span className="badge badge-green" style={{ marginLeft: 8 }}>matched from PO</span>}
-                  {addrMatched === false && <span className="badge badge-blue" style={{ marginLeft: 8 }}>new — added from PO</span>}
+                  {addrMatched === false && <span className="badge badge-blue" style={{ marginLeft: 8 }}>from PO — not on file</span>}
                 </span>
                 <button
                   type="button"
