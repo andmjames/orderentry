@@ -1,5 +1,5 @@
 // Push an approved order to Zoho Inventory as a Sales Order.
-const { zohoPost, headers, checkEnv } = require('./zoho-utils');
+const { zohoPut, zohoPost, headers, checkEnv } = require('./zoho-utils');
 
 exports.handler = async (event) => {
   if (event.httpMethod === 'OPTIONS') return { statusCode: 200, headers, body: '' };
@@ -63,17 +63,26 @@ exports.handler = async (event) => {
     let result;
     if (shipAddr) {
       try {
+        // 1) Inline on the sales order — no changes to the customer record at all.
         result = await zohoPost('/salesorders', { ...body, shipping_address: shipAddr });
       } catch (inlineErr) {
-        // Inline rejected (likely too long). Save as an ADDITIONAL contact address and
-        // reference it by id — this does NOT overwrite the customer's primary address.
+        // 2) Inline was rejected (Zoho caps inline address length). Prefer saving the
+        //    ship-to as an ADDITIONAL contact address and referencing it by id — this
+        //    does NOT overwrite the customer's primary address. Needs contacts.CREATE.
         let addressId = null;
         try {
           const addRes = await zohoPost(`/contacts/${order.customer_id}/address`, shipAddr);
           const info = addRes.address_info || addRes.address || {};
           addressId = info.address_id || addRes.address_id || null;
-        } catch (e) {
-          return { statusCode: 502, headers, body: JSON.stringify({ error: `Could not save shipping address to customer: ${e.message}` }) };
+        } catch (addErr) {
+          // 3) The token lacks the contacts.CREATE scope (code 57). Fall back to updating
+          //    the contact's primary shipping address (contacts.UPDATE) so the order can
+          //    still go through. NOTE: this overwrites the customer's saved ship-to.
+          try {
+            await zohoPut(`/contacts/${order.customer_id}`, { shipping_address: shipAddr });
+          } catch (putErr) {
+            return { statusCode: 502, headers, body: JSON.stringify({ error: `Could not save shipping address to customer: ${putErr.message}` }) };
+          }
         }
         result = await zohoPost('/salesorders', addressId ? { ...body, shipping_address_id: addressId } : body);
       }
