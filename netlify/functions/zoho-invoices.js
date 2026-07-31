@@ -10,14 +10,22 @@ exports.handler = async (event) => {
     const { id } = event.queryStringParameters || {};
     if (!id) return { statusCode: 400, headers, body: JSON.stringify({ error: 'id required' }) };
 
-    // Overdue = past the due date with an outstanding balance.
-    const data = await zohoGet(`/invoices?customer_id=${encodeURIComponent(id)}&filter_by=Status.Overdue&per_page=200&sort_column=due_date`);
+    // Fetch invoices with an outstanding balance, then compute "overdue" ourselves from
+    // each due date (more robust than relying on Zoho's status-filter spelling). If the
+    // Unpaid filter is rejected, retry with no status filter.
+    let data;
+    try {
+      data = await zohoGet(`/invoices?customer_id=${encodeURIComponent(id)}&filter_by=Status.Unpaid&per_page=200`);
+    } catch (filterErr) {
+      data = await zohoGet(`/invoices?customer_id=${encodeURIComponent(id)}&per_page=200`);
+    }
     const list = Array.isArray(data.invoices) ? data.invoices : [];
 
     const startOfToday = new Date();
     startOfToday.setHours(0, 0, 0, 0);
     const DAY = 86400000;
 
+    const EXCLUDE = new Set(['draft', 'void', 'paid']);
     const overdue = list
       .map(inv => {
         const bal = Number(inv.balance != null ? inv.balance : inv.total) || 0;
@@ -28,9 +36,10 @@ exports.handler = async (event) => {
           due_date: inv.due_date || '',
           balance: bal,
           days_overdue: days,
+          status: String(inv.status || '').toLowerCase(),
         };
       })
-      .filter(inv => inv.balance > 0 && inv.days_overdue >= 1);
+      .filter(inv => inv.balance > 0 && inv.days_overdue >= 1 && !EXCLUDE.has(inv.status));
 
     const held = overdue.filter(i => i.days_overdue >= 15);
     const onCreditHold = held.length > 0;

@@ -296,7 +296,7 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
       setCustomer(cust);
 
       // Credit-hold check runs in parallel; never blocks or breaks the order flow.
-      fetchCustomerCreditStatus(id).then(setCredit).catch(() => setCredit({ error: true }));
+      fetchCustomerCreditStatus(id).then(setCredit).catch((e) => setCredit({ error: true, message: e.message }));
 
       // Match the PO ship-to against the customer's addresses; add a new one if needed.
       const pick = pickShippingAddress(analysis.ship_to, cust.shippingAddresses || []);
@@ -907,7 +907,12 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
           border: '1px solid #fcd34d', background: '#fffbeb', borderRadius: 8,
           padding: '8px 12px', marginBottom: 14, fontSize: 12.5, color: '#92400e',
         }}>
-          Couldn&rsquo;t verify this customer&rsquo;s credit status (overdue invoices). If this persists, the Zoho token may need the <code>ZohoInventory.invoices.READ</code> scope.
+          Couldn&rsquo;t verify this customer&rsquo;s credit status (overdue invoices).
+          {credit.message && (
+            <div style={{ marginTop: 4, fontFamily: 'monospace', fontSize: 11.5, wordBreak: 'break-word' }}>
+              {credit.message}
+            </div>
+          )}
         </div>
       )}
       <div className="section">
