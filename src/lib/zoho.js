@@ -26,6 +26,11 @@ export async function fetchCustomer(customerId) {
   return apiFetch(`/zoho-customer?id=${encodeURIComponent(customerId)}`);
 }
 
+// Credit-hold status derived from the customer's overdue invoices in Zoho.
+export async function fetchCustomerCreditStatus(customerId) {
+  return apiFetch(`/zoho-invoices?id=${encodeURIComponent(customerId)}`);
+}
+
 // Adds a new shipping address to the customer's contact record in Zoho.
 export async function addCustomerAddress(customerId, address) {
   return apiFetch('/zoho-add-address', {

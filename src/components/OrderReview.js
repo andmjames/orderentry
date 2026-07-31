@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { fetchCustomer, fetchItemDetailsBySku, matchOrder, createSalesOrder, checkDuplicatePo, attachSalesOrderPdf, attachSalesOrderFile, addCustomerAddress, findSalesOrderByNumber } from '../lib/zoho';
+import { fetchCustomer, fetchCustomerCreditStatus, fetchItemDetailsBySku, matchOrder, createSalesOrder, checkDuplicatePo, attachSalesOrderPdf, attachSalesOrderFile, addCustomerAddress, findSalesOrderByNumber } from '../lib/zoho';
 import { fetchCustomerPricing } from '../lib/supabase';
 import { buildPackingPdf } from '../lib/packingPdf';
 import { buildPalletLabelsPdf } from '../lib/palletPdf';
@@ -22,6 +22,9 @@ const PRICING_APP_URL = process.env.REACT_APP_PRICING_APP_URL || '';
 // Zoho item used for the discount adjustment line (the "Duties" non-inventory item,
 // reused as a generic negative-amount line — same item shown on adjustment lines in Zoho).
 const DISCOUNT_ITEM_ID = '2211255000000234247';
+
+// Canned reply the user sends when a customer on credit hold places an order.
+const CREDIT_HOLD_REPLY = 'Thank you very much for your order. Unfortunately, we are unable to ship any new orders until payment for the attached invoice has been received. If I can help in any way please let me know. Thanks again.';
 
 // Parse a customer's Discount custom field into a fraction (e.g. "6%" / "6" -> 0.06,
 // "0.06" -> 0.06). Returns 0 when there's no usable discount.
@@ -263,6 +266,8 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
   const [excluded, setExcluded] = useState([]);
   const [methodOverride, setMethodOverride] = useState(null);
   const [palletsOverride, setPalletsOverride] = useState(null); // null = use calculated
+  const [credit, setCredit] = useState(null); // { onCreditHold, any15to29, any30plus, ... } | { error }
+  const [copiedReply, setCopiedReply] = useState(false);
   const [methodNameOverride, setMethodNameOverride] = useState(null); // manual carrier/method text
   const [accountOverride, setAccountOverride] = useState(null);       // manual shipping account #
   const [loading, setLoading] = useState(false);
@@ -285,9 +290,13 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
     setMethodOverride(null); setShowPicker(false); setFreightOverride(null);
     setMethodNameOverride(null); setAccountOverride(null); setPalletsOverride(null);
     setPalletData(null); setShowPallet(false); setShowRemarks(false);
+    setCredit(null); setCopiedReply(false);
     try {
       const cust = await fetchCustomer(id);
       setCustomer(cust);
+
+      // Credit-hold check runs in parallel; never blocks or breaks the order flow.
+      fetchCustomerCreditStatus(id).then(setCredit).catch(() => setCredit({ error: true }));
 
       // Match the PO ship-to against the customer's addresses; add a new one if needed.
       const pick = pickShippingAddress(analysis.ship_to, cust.shippingAddresses || []);
@@ -853,6 +862,54 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
 
   return (
     <div>
+      {credit && credit.onCreditHold && (
+        <div style={{
+          border: '2px solid #dc2626', background: '#fef2f2', borderRadius: 10,
+          padding: '16px 18px', marginBottom: 16,
+        }}>
+          <div style={{ color: '#b91c1c', fontWeight: 800, fontSize: 22, letterSpacing: '-0.01em' }}>
+            This customer is on credit hold
+          </div>
+          <div style={{ marginTop: 10, fontSize: 13.5, color: '#7f1d1d', lineHeight: 1.5 }}>
+            Reply to their order with, &ldquo;{CREDIT_HOLD_REPLY}&rdquo;
+            <button
+              type="button"
+              onClick={() => {
+                try {
+                  navigator.clipboard.writeText(CREDIT_HOLD_REPLY);
+                  setCopiedReply(true);
+                  setTimeout(() => setCopiedReply(false), 2000);
+                } catch { /* clipboard unavailable */ }
+              }}
+              style={{
+                marginLeft: 8, padding: '2px 8px', fontSize: 12, cursor: 'pointer',
+                border: '1px solid #dc2626', borderRadius: 6, background: '#fff', color: '#b91c1c',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {copiedReply ? 'Copied' : 'Copy reply'}
+            </button>
+          </div>
+          {credit.any15to29 && (
+            <div style={{ marginTop: 8, fontSize: 13, color: '#7f1d1d' }}>
+              • We need to get a notification of payment to ship future orders
+            </div>
+          )}
+          {credit.any30plus && (
+            <div style={{ marginTop: 6, fontSize: 13, color: '#7f1d1d' }}>
+              • We need to receive the payment (not just get a notification) before shipping any new orders
+            </div>
+          )}
+        </div>
+      )}
+      {credit && credit.error && (
+        <div style={{
+          border: '1px solid #fcd34d', background: '#fffbeb', borderRadius: 8,
+          padding: '8px 12px', marginBottom: 14, fontSize: 12.5, color: '#92400e',
+        }}>
+          Couldn&rsquo;t verify this customer&rsquo;s credit status (overdue invoices). If this persists, the Zoho token may need the <code>ZohoInventory.invoices.READ</code> scope.
+        </div>
+      )}
       <div className="section">
         <div className="section-header">
           <div className="section-title"><span className="section-title-dot" />Customer</div>
