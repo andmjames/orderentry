@@ -164,6 +164,44 @@ Notes:
       messages: [
         { role: 'user', content: [ fileBlock, { type: 'text', text: prompt } ] },
       ],
+      // Structured output via tool use: the API returns an already-parsed, schema-checked
+      // JSON object, so malformed text (unescaped inch marks, code fences) can't break us.
+      tools: [{
+        name: 'submit_po',
+        description: 'Return the extracted purchase order data.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            document_type: { type: 'string' },
+            sales_order_number: { type: ['string', 'null'] },
+            customer_guess: { type: ['string', 'null'] },
+            customer_id: { type: ['string', 'null'] },
+            confidence: { type: ['number', 'null'] },
+            po_number: { type: ['string', 'null'] },
+            po_date: { type: ['string', 'null'] },
+            ship_to: { type: ['object', 'null'] },
+            shipping_method: { type: ['string', 'null'] },
+            parcel_account_number: { type: ['string', 'null'] },
+            freight_account_number: { type: ['string', 'null'] },
+            line_items: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  identifier: { type: ['string', 'null'] },
+                  customer_identifier: { type: ['string', 'null'] },
+                  description: { type: ['string', 'null'] },
+                  quantity: { type: ['number', 'null'] },
+                  unit_of_measure: { type: ['string', 'null'] },
+                  unit_price: { type: ['number', 'null'] },
+                },
+              },
+            },
+          },
+          required: ['line_items'],
+        },
+      }],
+      tool_choice: { type: 'tool', name: 'submit_po' },
     };
 
     const res = await fetch(ANTHROPIC_URL, {
@@ -181,12 +219,24 @@ Notes:
       throw new Error(`Anthropic API ${res.status}: ${JSON.stringify(data)}`);
     }
 
+    // Preferred path: the tool_use block's `input` is already a parsed JSON object.
+    const toolBlock = (data.content || []).find(b => b.type === 'tool_use' && b.input);
+    if (toolBlock) {
+      return { statusCode: 200, headers, body: JSON.stringify(toolBlock.input) };
+    }
+
     const text = (data.content || [])
       .filter(b => b.type === 'text')
       .map(b => b.text)
       .join('\n');
 
-    const result = parseJson(text);
+    let result;
+    try {
+      result = parseJson(text);
+    } catch (e) {
+      const snippet = String(text || '').slice(0, 400).replace(/\s+/g, ' ');
+      throw new Error(`Could not parse PO analysis (${e.message}). Model output started: ${snippet}`);
+    }
     return { statusCode: 200, headers, body: JSON.stringify(result) };
   } catch (err) {
     console.error('po-analyze error:', err);

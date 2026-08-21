@@ -122,6 +122,45 @@ Every PO line must appear in exactly one of the two arrays. ordered_quantity mus
       max_tokens: 4096,
       temperature: 0,
       messages: [ { role: 'user', content: prompt } ],
+      // Structured output via tool use: the API returns an already-parsed, schema-checked
+      // JSON object, so malformed text (unescaped inch marks, code fences) can't break us.
+      tools: [{
+        name: 'submit_matches',
+        description: 'Return the PO-line-to-catalog matching result.',
+        input_schema: {
+          type: 'object',
+          properties: {
+            matches: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  po_index: { type: 'integer' },
+                  item_number: { type: 'string' },
+                  ordered_quantity: { type: 'number' },
+                  basis: { type: 'string' },
+                },
+                required: ['po_index', 'item_number', 'ordered_quantity'],
+              },
+            },
+            unmatched: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  po_index: { type: 'integer' },
+                  identifier: { type: 'string' },
+                  description: { type: 'string' },
+                  reason: { type: 'string' },
+                },
+                required: ['po_index'],
+              },
+            },
+          },
+          required: ['matches', 'unmatched'],
+        },
+      }],
+      tool_choice: { type: 'tool', name: 'submit_matches' },
     };
 
     const res = await fetch(ANTHROPIC_URL, {
@@ -137,8 +176,22 @@ Every PO line must appear in exactly one of the two arrays. ordered_quantity mus
     const data = await res.json();
     if (!res.ok) throw new Error(`Anthropic API ${res.status}: ${JSON.stringify(data)}`);
 
+    // Preferred path: the tool_use block's `input` is already a parsed JSON object.
+    const toolBlock = (data.content || []).find(b => b.type === 'tool_use' && b.input);
+    if (toolBlock) {
+      return { statusCode: 200, headers, body: JSON.stringify(toolBlock.input) };
+    }
+
+    // Fallback: parse text output (older behaviour), with repair for malformed JSON.
     const text = (data.content || []).filter(b => b.type === 'text').map(b => b.text).join('\n');
-    const result = parseJson(text);
+    let result;
+    try {
+      result = parseJson(text);
+    } catch (e) {
+      // Surface what the model actually returned so the failure is diagnosable.
+      const snippet = String(text || '').slice(0, 400).replace(/\s+/g, ' ');
+      throw new Error(`Could not parse match response (${e.message}). Model output started: ${snippet}`);
+    }
     return { statusCode: 200, headers, body: JSON.stringify(result) };
   } catch (err) {
     console.error('po-match error:', err);
