@@ -12,6 +12,38 @@ const headers = {
 };
 
 // Pull the first JSON object out of a model response, tolerating code fences / prose.
+// Repair JSON whose string values contain unescaped double quotes — most often inch
+// marks in product descriptions (e.g. "2" White Tape"), which otherwise terminate the
+// string early and break JSON.parse. Walks the text tracking string state; a quote
+// inside a string is treated as a real closing quote only when the next meaningful
+// character is a structural delimiter, otherwise it gets escaped.
+function repairInnerQuotes(src) {
+  let out = '';
+  let inStr = false;
+  for (let i = 0; i < src.length; i++) {
+    const ch = src[i];
+    if (!inStr) {
+      out += ch;
+      if (ch === '"') inStr = true;
+      continue;
+    }
+    if (ch === '\\') { out += ch + (src[i + 1] || ''); i++; continue; }
+    if (ch === '"') {
+      let j = i + 1;
+      while (j < src.length && /\s/.test(src[j])) j++;
+      const next = src[j];
+      if (next === undefined || next === ',' || next === ':' || next === '}' || next === ']') {
+        out += ch; inStr = false;
+      } else {
+        out += '\\"';
+      }
+      continue;
+    }
+    out += ch;
+  }
+  return out;
+}
+
 function parseJson(text) {
   if (!text) throw new Error('Empty response from Claude');
   let t = String(text).trim();
@@ -24,8 +56,10 @@ function parseJson(text) {
   try {
     return JSON.parse(t);
   } catch (e) {
+    // Unescaped inner quotes (inch marks) are the common culprit — repair and retry.
+    try { return JSON.parse(repairInnerQuotes(t)); } catch { /* fall through */ }
     // Last resort: drop any stray backticks (never valid in this JSON) and retry once.
-    try { return JSON.parse(t.replace(/`/g, '')); }
+    try { return JSON.parse(repairInnerQuotes(t.replace(/`/g, ''))); }
     catch { throw e; }
   }
 }
@@ -82,7 +116,7 @@ ${JSON.stringify(customerNames, null, 2)}
 
 2) EXTRACT EVERY LINE ITEM exactly as printed. Do not invent items.
 
-Return ONLY a JSON object, no prose, with this shape:
+Return ONLY a JSON object, no prose, with this shape (no markdown fences). IMPORTANT: inside JSON string values, any double-quote character must be escaped as \\" — product descriptions often contain inch marks (e.g. 3\\" x 60YD). An unescaped inch mark makes the response invalid JSON.
 {
   "document_type": "<'sales_order' or 'purchase_order'>",
   "sales_order_number": "<our Sales Order # if document_type is sales_order, else null>",
