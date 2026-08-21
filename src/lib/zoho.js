@@ -9,12 +9,30 @@ async function apiFetch(path, options = {}) {
     headers: { 'Content-Type': 'application/json' },
     ...options,
   });
+
+  // Read the body ONCE as text. A Response body is a stream and can only be consumed
+  // a single time — calling res.json() and then res.text() throws "body stream already
+  // read", which masks the real error (e.g. a function timeout returning an HTML page).
+  const raw = await res.text();
+
   if (!res.ok) {
     let detail = '';
-    try { detail = (await res.json()).error || ''; } catch { detail = await res.text(); }
-    throw new Error(detail || `API error ${res.status}`);
+    try { detail = (JSON.parse(raw) || {}).error || ''; } catch { detail = ''; }
+    if (!detail) {
+      const snippet = String(raw || '').trim().slice(0, 300);
+      detail = snippet || `API error ${res.status}`;
+      if (res.status === 502 || res.status === 504) {
+        detail = `The request timed out or the server errored (${res.status}). ${snippet}`.trim();
+      }
+    }
+    throw new Error(detail);
   }
-  return res.json();
+
+  try {
+    return JSON.parse(raw);
+  } catch {
+    throw new Error(`Unexpected non-JSON response from ${path}: ${String(raw).trim().slice(0, 300)}`);
+  }
 }
 
 // ── Customers ────────────────────────────────────────────────────────────────
