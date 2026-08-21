@@ -14,11 +14,20 @@ const headers = {
 // Pull the first JSON object out of a model response, tolerating code fences / prose.
 function parseJson(text) {
   if (!text) throw new Error('Empty response from Claude');
-  let t = text.trim().replace(/^```(?:json)?/i, '').replace(/```$/, '').trim();
+  let t = String(text).trim();
+  // Remove markdown code fences anywhere in the output (```json ... ``` or stray ```),
+  // not just at the very start/end — models sometimes wrap or annotate the JSON.
+  t = t.replace(/```+(?:json)?/gi, '');
   const start = t.indexOf('{');
   const end   = t.lastIndexOf('}');
-  if (start !== -1 && end !== -1) t = t.slice(start, end + 1);
-  return JSON.parse(t);
+  if (start !== -1 && end !== -1 && end > start) t = t.slice(start, end + 1);
+  try {
+    return JSON.parse(t);
+  } catch (e) {
+    // Last resort: drop any stray backticks (never valid in this JSON) and retry once.
+    try { return JSON.parse(t.replace(/`/g, '')); }
+    catch { throw e; }
+  }
 }
 
 exports.handler = async (event) => {
