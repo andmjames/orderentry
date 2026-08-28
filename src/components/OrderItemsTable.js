@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { money } from '../lib/order';
 
-const CALENDAR_URL = 'https://teamup.com/ks85fyeys7howgnc42';
+const CALENDAR_URL = 'https://pmiproductioncalendar.netlify.app/u/8deaf01f3f9065936d9eda11';
 
 export default function OrderItemsTable({ lines, excluded, currency, onCasesChange, onQtyChange, onRemove, onReorder, onAddItems, addOpen }) {
   const subtotal = lines.reduce((s, l) => s + (l.total != null ? l.total : 0), 0);
