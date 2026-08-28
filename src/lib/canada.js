@@ -53,7 +53,7 @@ export const USMCA = {
   ],
   company: 'Packaging Materials, Inc.',
   name: 'Andrew James',
-  titleField: 'Vice President',
+  titleField: 'President',
   telephone: '317-773-8915',
   fax: '317-773-9219',
 };
