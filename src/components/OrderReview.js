@@ -939,28 +939,15 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
           )}
         </div>
       )}
-      {moq && (
+      {moqBelow && (
         <div style={{
           border: '2px solid #ea580c', background: '#fff7ed', borderRadius: 10,
           padding: '16px 18px', marginBottom: 16,
         }}>
           <div style={{ color: '#c2410c', fontWeight: 800, fontSize: 22, letterSpacing: '-0.01em' }}>
-            This customer has a minimum order quantity
-            {moq.minCases != null ? ` (${moq.minCases} cases)` : ''}
+            This order is below the customer&rsquo;s minimum order quantity
+            {` (${totals.cases} of ${moq.minCases} cases)`}
           </div>
-          {moq.minCases != null && (
-            moqReady ? (
-              <div style={{ marginTop: 6, fontSize: 13.5, fontWeight: 600, color: moqBelow ? '#b91c1c' : '#166534' }}>
-                {moqBelow
-                  ? `This order is ${totals.cases} case${totals.cases === 1 ? '' : 's'} — below the ${moq.minCases}-case minimum.`
-                  : `This order is ${totals.cases} cases — meets the ${moq.minCases}-case minimum.`}
-              </div>
-            ) : (
-              <div style={{ marginTop: 6, fontSize: 13, color: '#9a3412' }}>
-                Checking this order&rsquo;s quantity…
-              </div>
-            )
-          )}
           <div style={{ marginTop: 10, fontSize: 13.5, color: '#7c2d12', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
             {moq.text}
             <button
