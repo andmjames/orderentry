@@ -26,6 +26,22 @@ const DISCOUNT_ITEM_ID = '2211255000000234247';
 // Canned reply the user sends when a customer on credit hold places an order.
 const CREDIT_HOLD_REPLY = 'Thank you very much for your order. Unfortunately, we are unable to ship any new orders until payment for the attached invoice has been received. If I can help in any way please let me know. Thanks again.';
 
+// Detects a minimum-order-quantity remark on a customer's Zoho record. Returns null when
+// there is none; otherwise the full remark, the quoted reply to copy (falls back to the
+// whole remark), and the minimum case count if it can be parsed.
+function parseMoqRemark(remarks) {
+  const text = String(remarks || '').trim();
+  if (!text) return null;
+  if (!/minimum\s*order|min\.?\s*order|\bMOQ\b/i.test(text)) return null;
+  const quoted = text.match(/"([^"]{20,})"/) || text.match(/\u201C([^\u201D]{20,})\u201D/);
+  const reply = quoted ? quoted[1].trim() : text;
+  const num = text.match(/minimum\s*order\s*(?:quantity|qty)?\s*(?:is|of|:)?\s*(\d+)/i)
+    || text.match(/\bMOQ\b\s*(?:is|of|:)?\s*(\d+)/i)
+    || text.match(/(\d+)\s*cases?\s*minimum/i);
+  const minCases = num ? parseInt(num[1], 10) : null;
+  return { text, reply, minCases };
+}
+
 // Parse a customer's Discount custom field into a fraction (e.g. "6%" / "6" -> 0.06,
 // "0.06" -> 0.06). Returns 0 when there's no usable discount.
 function discountFraction(raw) {
@@ -268,6 +284,7 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
   const [palletsOverride, setPalletsOverride] = useState(null); // null = use calculated
   const [credit, setCredit] = useState(null); // { onCreditHold, any15to29, any30plus, ... } | { error }
   const [copiedReply, setCopiedReply] = useState(false);
+  const [copiedMoq, setCopiedMoq] = useState(false);
   const [methodNameOverride, setMethodNameOverride] = useState(null); // manual carrier/method text
   const [accountOverride, setAccountOverride] = useState(null);       // manual shipping account #
   const [loading, setLoading] = useState(false);
@@ -290,7 +307,7 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
     setMethodOverride(null); setShowPicker(false); setFreightOverride(null);
     setMethodNameOverride(null); setAccountOverride(null); setPalletsOverride(null);
     setPalletData(null); setShowPallet(false); setShowRemarks(false);
-    setCredit(null); setCopiedReply(false);
+    setCredit(null); setCopiedReply(false); setCopiedMoq(false);
     try {
       const cust = await fetchCustomer(id);
       setCustomer(cust);
@@ -499,6 +516,10 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
   const discountPctLabel = discFrac > 0 ? `${+(discFrac * 100).toFixed(2)}%` : '';
   const discountAmount = discFrac > 0 ? round2(totals.subtotal * discFrac) : 0;
   const orderTotal = round2(totals.subtotal + effectiveFreight - discountAmount);
+
+  // Minimum-order-quantity remark on the customer's Zoho record, if any.
+  const moq = parseMoqRemark(customer?.remarks);
+  const moqBelow = moq && moq.minCases != null && totals.cases < moq.minCases;
 
   // Hide an "excluded" PO line only once that item is actually in the order
   // (matched, or added via "+ Add Item") — matched by item number/alias.
@@ -913,6 +934,44 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
               {credit.message}
             </div>
           )}
+        </div>
+      )}
+      {moq && (
+        <div style={{
+          border: '2px solid #ea580c', background: '#fff7ed', borderRadius: 10,
+          padding: '16px 18px', marginBottom: 16,
+        }}>
+          <div style={{ color: '#c2410c', fontWeight: 800, fontSize: 22, letterSpacing: '-0.01em' }}>
+            This customer has a minimum order quantity
+            {moq.minCases != null ? ` (${moq.minCases} cases)` : ''}
+          </div>
+          {moq.minCases != null && (
+            <div style={{ marginTop: 6, fontSize: 13.5, fontWeight: 600, color: moqBelow ? '#b91c1c' : '#166534' }}>
+              {moqBelow
+                ? `This order is ${totals.cases} case${totals.cases === 1 ? '' : 's'} — below the ${moq.minCases}-case minimum.`
+                : `This order is ${totals.cases} cases — meets the ${moq.minCases}-case minimum.`}
+            </div>
+          )}
+          <div style={{ marginTop: 10, fontSize: 13.5, color: '#7c2d12', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
+            {moq.text}
+            <button
+              type="button"
+              onClick={() => {
+                try {
+                  navigator.clipboard.writeText(moq.reply);
+                  setCopiedMoq(true);
+                  setTimeout(() => setCopiedMoq(false), 2000);
+                } catch { /* clipboard unavailable */ }
+              }}
+              style={{
+                marginLeft: 8, padding: '2px 8px', fontSize: 12, cursor: 'pointer',
+                border: '1px solid #ea580c', borderRadius: 6, background: '#fff', color: '#c2410c',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {copiedMoq ? 'Copied' : 'Copy reply'}
+            </button>
+          </div>
         </div>
       )}
       <div className="section">
