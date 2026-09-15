@@ -517,9 +517,12 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
   const discountAmount = discFrac > 0 ? round2(totals.subtotal * discFrac) : 0;
   const orderTotal = round2(totals.subtotal + effectiveFreight - discountAmount);
 
-  // Minimum-order-quantity remark on the customer's Zoho record, if any.
+  // Minimum-order-quantity remark on the customer's Zoho record, if any. The case
+  // comparison waits until the order's lines have loaded — before that totals.cases is 0
+  // and would wrongly read as "below the minimum".
   const moq = parseMoqRemark(customer?.remarks);
-  const moqBelow = moq && moq.minCases != null && totals.cases < moq.minCases;
+  const moqReady = !loading;
+  const moqBelow = moqReady && moq && moq.minCases != null && totals.cases < moq.minCases;
 
   // Hide an "excluded" PO line only once that item is actually in the order
   // (matched, or added via "+ Add Item") — matched by item number/alias.
@@ -946,11 +949,17 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
             {moq.minCases != null ? ` (${moq.minCases} cases)` : ''}
           </div>
           {moq.minCases != null && (
-            <div style={{ marginTop: 6, fontSize: 13.5, fontWeight: 600, color: moqBelow ? '#b91c1c' : '#166534' }}>
-              {moqBelow
-                ? `This order is ${totals.cases} case${totals.cases === 1 ? '' : 's'} — below the ${moq.minCases}-case minimum.`
-                : `This order is ${totals.cases} cases — meets the ${moq.minCases}-case minimum.`}
-            </div>
+            moqReady ? (
+              <div style={{ marginTop: 6, fontSize: 13.5, fontWeight: 600, color: moqBelow ? '#b91c1c' : '#166534' }}>
+                {moqBelow
+                  ? `This order is ${totals.cases} case${totals.cases === 1 ? '' : 's'} — below the ${moq.minCases}-case minimum.`
+                  : `This order is ${totals.cases} cases — meets the ${moq.minCases}-case minimum.`}
+              </div>
+            ) : (
+              <div style={{ marginTop: 6, fontSize: 13, color: '#9a3412' }}>
+                Checking this order&rsquo;s quantity…
+              </div>
+            )
           )}
           <div style={{ marginTop: 10, fontSize: 13.5, color: '#7c2d12', lineHeight: 1.5, whiteSpace: 'pre-wrap' }}>
             {moq.text}
