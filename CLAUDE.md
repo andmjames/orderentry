@@ -95,6 +95,9 @@ Live: https://pmiorder.netlify.app · Repo: andmjames/orderentry
 - **Private-label matching**: PMI manufactures product that customers stock under their own
   brand. Match on product spec (family number, width, length, type) and ignore the brand
   label — e.g. a PO line for `PMI #451 3"` matches catalog item `RIV3451` (River City).
+  BUT variant suffixes (`HC`, `FA`, `HT`, `FTA`) ARE part of the spec: a plain PO line
+  matches the plain item, never a suffixed one — e.g. `PMI 451 Tape 4"` → `SCR4451`,
+  not `PMI4451HC`, even though the latter shares the PMI brand.
 - **Customer-specific docs**: Ryonet barcode note; Image Technology + Screen Printers Resource
   get the boxed "Do Not Stack" cone/label note; plastic-pallet customer list; Nazdar footer;
   Menards Bill of Lading; Canada/USMCA customs pages.

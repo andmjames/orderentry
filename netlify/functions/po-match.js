@@ -96,6 +96,11 @@ BRAND / PRIVATE-LABEL EQUIVALENCE (important): PMI Tape is the manufacturer, and
 Example: a PO line "PMI #451-3" Split Tape / 3"X60YD PMI #451 Split Tape" MUST match a catalog item like "RIV3451 — River City #451 Split Tape, 3"x60YD", because both are the 451 Split Tape in 3" x 60YD; only the brand differs (PMI vs River City), which does not matter.
 Still require the spec to genuinely align: never match across a different family number (451 vs 560), a different width (3" vs 2"), or a different product type. Leave a line unmatched only when NO catalog item shares the same product family, width, and type — not merely because the brand label differs.
 
+VARIANT SUFFIXES ARE PART OF THE SPEC. Item numbers may end in a variant suffix such as HC, FA, HT, or FTA (e.g. PMI4451 vs PMI4451HC vs PMI4451FA). These are DIFFERENT products, and the suffix is a distinguishing attribute exactly like width:
+- A PO line that names a variant (e.g. 'Full Adhesive', 'FA', 'HC', 'High Tack', 'HT') must match the catalog item carrying that suffix.
+- A PO line with NO variant wording (e.g. just 'PMI 451 Tape 4" x 60 yards' or '#451 Split Tape') is the PLAIN product and must match the item with NO suffix. Never match a plain line to a suffixed item just because they share a family number and brand.
+- Brand is ignored but suffix is not: when the plain product exists only under the customer's private label, choose it. Example: for 'PMI 451 TAPE 4" X 60 YARDS' where the catalog has SCR4451 (private-label plain 4" 451) and PMI4451HC (HC variant), the correct match is SCR4451 — the brand differs but the spec matches; PMI4451HC shares the brand but is the wrong variant.
+
 For every matched line, return ordered_quantity = the number of individual selling units (each / rolls / sheets) ordered for that catalog item. NEVER round to a whole case.
 - If the PO quantity is already stated in individual units, ordered_quantity = that quantity exactly (e.g., 96 rolls stays 96).
 - If the PO quantity is stated in CASES (or cartons), ordered_quantity = cases × units_per_case for that catalog item.
