@@ -46,6 +46,7 @@ const PLASTIC_PALLET_CUSTOMERS = [
   'Macma Kft',
   'Macquip & Screenwise',
   'Merchout',
+  'One t-shirt s.r.l.',
   'PALS Print & Screen',
   'PC Technology NV',
   'PF Concept UK Operations Ltd',
