@@ -137,6 +137,7 @@ Return ONLY a JSON object, no prose, with this shape (no markdown fences). IMPOR
   "shipping_method": "<carrier / method as printed on the PO, e.g. 'UPS Ground', 'FedEx', 'LTL', 'Freight', 'Parcel', or null>",
   "parcel_account_number": "<account number for a small-parcel carrier (UPS / FedEx / USPS / Ground) if the PO lists one, else null>",
   "freight_account_number": "<account number for freight / LTL / truck carriers if the PO lists one, else null>",
+  "packing_instructions": "<any packing / labeling / prep / shipping-preparation instructions printed on the PO, copied verbatim (keep line breaks between separate instructions), or null if there are none. Amazon POs in particular carry these — e.g. carton labeling, pallet/prep requirements, routing or appointment notes. Do NOT include the ship-to address, line items, or pricing here>",
   "line_items": [
     {
       "identifier": "<OUR (the supplier's) item/part number for this line — the one to match against our catalog. Many POs print TWO numbers per line: the customer's own internal part number AND our/vendor number (often under a 'YOUR ITEM NUMBER', 'Vendor Item', 'Supplier Part', or 'Mfr #' column, and frequently starting with 'PMI'). Choose OUR/vendor number (usually the one starting with 'PMI'). If only one number is present, use it>",
@@ -194,6 +195,7 @@ Notes:
             shipping_method: { type: ['string', 'null'] },
             parcel_account_number: { type: ['string', 'null'] },
             freight_account_number: { type: ['string', 'null'] },
+            packing_instructions: { type: ['string', 'null'] },
             line_items: {
               type: 'array',
               items: {

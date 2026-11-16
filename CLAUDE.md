@@ -31,7 +31,11 @@ Live: https://pmiorder.netlify.app · Repo: andmjames/orderentry
 - Deploys happen by pushing to `main`; Netlify auto-builds and publishes.
 - Changes to `netlify/functions/**` REQUIRE a real build (function bundling). Never deploy
   those via Netlify's drag-and-drop.
-- The owner deploys through the GitHub web UI / PR merges — not a local CLI.
+- Claude deploys by committing directly to `main` through the session's GitHub integration
+  (no tokens, no file uploads). Small/safe changes go straight to `main`; riskier changes
+  (matching prompts, shipping math) go on a branch + PR for the owner to merge.
+- Before every push: `node --check` on changed functions/libs, bracket-balance JSX, and
+  confirm no unused vars/imports (CI-strict ESLint fails the build).
 
 ## Build constraints (these break deploys)
 
@@ -100,7 +104,8 @@ Live: https://pmiorder.netlify.app · Repo: andmjames/orderentry
   not `PMI4451HC`, even though the latter shares the PMI brand.
 - **Customer-specific docs**: Ryonet barcode note; Image Technology + Screen Printers Resource
   get the boxed "Do Not Stack" cone/label note; plastic-pallet customer list; Nazdar footer;
-  Menards Bill of Lading; Canada/USMCA customs pages.
+  Menards Bill of Lading; Canada/USMCA customs pages; Amazon packing lists reproduce the
+  PO's packing instructions (`analysis.packing_instructions`) in a boxed section.
 - Never use PMI's own address (525 Herriman Ct, Noblesville IN 46060) as a ship-to.
 
 ---

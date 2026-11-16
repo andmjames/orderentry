@@ -168,7 +168,7 @@ async function withRetry(fn, tries = 3, baseMs = 800) {
 // Build the packing-list and pallet-label data objects. Shared by the new-order
 // flow and the Sales Order reprint flow so both produce identical documents
 // (same special notes, same BOL, same format).
-function buildDocs({ customer, shipping, totals, poNumber, invoiceNumber, shipAddr, docLines, accountNote }) {
+function buildDocs({ customer, shipping, totals, poNumber, invoiceNumber, shipAddr, docLines, accountNote, packingInstructions }) {
   // One USMCA row per unique item.
   const seen = new Set();
   const usmcaItems = [];
@@ -229,6 +229,8 @@ function buildDocs({ customer, shipping, totals, poNumber, invoiceNumber, shipAd
     nazdar: /nazdar/i.test(customer.name || ''),
     doNotStackNote: wantsDoNotStackNote(customer.name),
     plasticPallets: isPlasticPalletCustomer(customer.name) && shipping.pallets > 0,
+    // Amazon POs carry packing/prep instructions; reproduce them on the packing list.
+    packingInstructions: /amazon/i.test(customer.name || '') ? String(packingInstructions || '').trim() : '',
     canada: shipsToCanada,
     importerLines: shipToLines(shipAddr, customer.name),
     usmcaItems,
@@ -743,6 +745,7 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
         shipAddr: selectedAddr?.addr || null,
         docLines: sendable,
         accountNote: shippingAccountNote(effectiveMethod, effectiveAccount),
+        packingInstructions: analysis.packing_instructions || '',
       });
       setPackingData(packing);
       setPalletData(pallet);

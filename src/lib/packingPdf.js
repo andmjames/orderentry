@@ -154,6 +154,34 @@ export function buildPackingPdf(data) {
     y += boxH;
   }
 
+  // Packing instructions copied from the PO (Amazon) — boxed, left-aligned, wrapped.
+  if (data.packingInstructions) {
+    const pad = 10;
+    const lineH = 13;
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    const paras = String(data.packingInstructions).split(/\r?\n/);
+    const lines = [];
+    paras.forEach(p => {
+      if (!p.trim()) { lines.push(''); return; }
+      doc.splitTextToSize(p, right - M - pad * 2).forEach(ln => lines.push(ln));
+    });
+    const boxH = 22 + lines.length * lineH + pad;
+    y += 24;
+    if (y + boxH > 762) { doc.addPage(); y = M + 24; }
+    doc.setLineWidth(0.8);
+    doc.setTextColor(0, 0, 0);
+    doc.rect(M, y, right - M, boxH);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(11);
+    doc.text('Packing Instructions', pageW / 2, y + 16, { align: 'center' });
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(10);
+    let ty = y + 16 + lineH + 2;
+    lines.forEach(ln => { if (ln) doc.text(ln, M + pad, ty); ty += lineH; });
+    y += boxH;
+  }
+
   // Plastic-pallet customers shipping on pallets — boxed, centered note.
   if (data.plasticPallets) {
     y += 24;

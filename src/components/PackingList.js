@@ -104,6 +104,13 @@ function PackingDoc({ data }) {
         </div>
       )}
 
+      {data.packingInstructions && (
+        <div style={{ border: '1px solid #000', padding: '12px 16px', fontSize: 13, lineHeight: 1.5, marginTop: 30, breakInside: 'avoid', pageBreakInside: 'avoid' }}>
+          <div style={{ fontWeight: 700, textAlign: 'center', marginBottom: 8, fontSize: 14 }}>Packing Instructions</div>
+          <div style={{ whiteSpace: 'pre-wrap' }}>{data.packingInstructions}</div>
+        </div>
+      )}
+
       {data.plasticPallets && (
         <div style={{ border: '1px solid #000', padding: '14px 12px', textAlign: 'center', fontSize: 16, marginTop: 30, breakInside: 'avoid', pageBreakInside: 'avoid' }}>
           {PLASTIC_PALLET_NOTE}
