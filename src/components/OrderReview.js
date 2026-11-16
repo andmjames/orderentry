@@ -315,7 +315,10 @@ export default function OrderReview({ analysis, fileName, poFile, customers, onB
       setCustomer(cust);
 
       // Credit-hold check runs in parallel; never blocks or breaks the order flow.
-      fetchCustomerCreditStatus(id).then(setCredit).catch((e) => setCredit({ error: true, message: e.message }));
+      // Amazon is exempt from credit hold: skip the overdue-invoice check entirely.
+      if (!/amazon/i.test(cust.name || '')) {
+        fetchCustomerCreditStatus(id).then(setCredit).catch((e) => setCredit({ error: true, message: e.message }));
+      }
 
       // Match the PO ship-to against the customer's addresses; add a new one if needed.
       const pick = pickShippingAddress(analysis.ship_to, cust.shippingAddresses || []);

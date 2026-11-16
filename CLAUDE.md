@@ -96,6 +96,7 @@ Live: https://pmiorder.netlify.app · Repo: andmjames/orderentry
   Zoho SO as a negative line item using the "Duties" item id `2211255000000234247`.
   It must NOT appear on the packing list.
 - **Credit hold**: any open invoice 15+ days overdue. 15–29 days and 30+ days each add a note.
+  Amazon is exempt: never flagged, regardless of past-due invoices.
 - **Private-label matching**: PMI manufactures product that customers stock under their own
   brand. Match on product spec (family number, width, length, type) and ignore the brand
   label — e.g. a PO line for `PMI #451 3"` matches catalog item `RIV3451` (River City).
