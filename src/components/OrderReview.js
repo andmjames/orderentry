@@ -67,7 +67,7 @@ function wantsDoNotStackNote(name) {
 }
 
 // Build the Customer Notes line for the Zoho SO when a shipping account is used.
-// "123456" + "UPS" -> "UPS Account Number 123456"; an already-descriptive value
+// "123456" + "UPS" -> "UPS Account Number: 123456"; an already-descriptive value
 // like "UPS Collect Account 674849" is used as-is to avoid redundancy.
 function shippingAccountNote(method, account) {
   const acct = String(account || '').trim();
@@ -75,7 +75,7 @@ function shippingAccountNote(method, account) {
   const m = String(method || '').trim();
   const lower = acct.toLowerCase();
   if (lower.includes('account') || (m && lower.includes(m.toLowerCase()))) return acct;
-  return m ? `${m} Account Number ${acct}` : `Account Number ${acct}`;
+  return m ? `${m} Account Number: ${acct}` : `Account Number: ${acct}`;
 }
 
 // Break a shipping address into label lines: name, street, street2, "city, ST zip", country.
