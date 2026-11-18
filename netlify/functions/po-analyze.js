@@ -122,7 +122,7 @@ Return ONLY a JSON object, no prose, with this shape (no markdown fences). IMPOR
   "sales_order_number": "<our Sales Order # if document_type is sales_order, else null>",
   "customer_name": "<exact name from the list, or null>",
   "confidence": <number 0-1>,
-  "po_number": "<the purchase order number exactly as printed, INCLUDING any hyphenated segment or suffix (e.g. '108746-00'). Look for a labeled field such as 'PO #', 'P/O NUMBER', 'Purchase Order', or 'Order Number', often in a boxed header. Use null only if there is genuinely no PO number anywhere>",
+  "po_number": "<the purchase order number exactly as printed, INCLUDING any hyphenated segment or suffix (e.g. '108746-00'). Look for a labeled field such as 'PO #', 'P/O NUMBER', 'Purchase Order', or 'Order Number', often in a boxed header. This is the number of THIS purchase order, issued to us by the company sending it — usually printed prominently beside the 'PURCHASE ORDER' title (e.g. 'Order no 60181926'). Do NOT use a field labeled 'Customer PO', 'Customer PO #', 'Customer Reference', 'End Customer PO' or similar: on distributor / drop-ship POs that is the distributor's own customer's PO number, not ours. Example: a PO showing 'Order no 60181926' and 'Customer PO PO28789' has po_number '60181926'. Use null only if there is genuinely no PO number anywhere>",
   "po_date": "<date on the PO as written, or null>",
   "ship_to": {
     "attention": "<company / contact the order ships to, or null>",
