@@ -6,6 +6,7 @@ import { printWithPage } from '../lib/printUtil';
 import { NAZDAR, IMAGE_TECH } from '../lib/nazdar';
 import { PLASTIC_PALLET_NOTE } from '../lib/plasticPallets';
 import { SIGNATURE_SRC } from '../signature';
+import { CONTAINER_DIAGRAM_SRC } from '../containerDiagram';
 import { SIGNATURE_MARK_SRC } from '../signatureMark';
 import { CUSTOMS_BOX, USMCA, PMI_PARTY, blanketPeriod, todayMDY } from '../lib/canada';
 
@@ -135,6 +136,15 @@ function PackingDoc({ data }) {
 }
 
 // ── Nazdar footer (its own page): DO NOT STACK + barcodes + certificates + signature ──
+// Full-page 20ft container loading diagram (APLA orders of 480+ cases).
+function ContainerDiagramDoc() {
+  return (
+    <div className="packing-doc" style={{ width: '100%', textAlign: 'center' }}>
+      <img src={CONTAINER_DIAGRAM_SRC} alt="How to load 20ft container" style={{ width: '100%', maxWidth: 720, height: 'auto' }} />
+    </div>
+  );
+}
+
 function NazdarDoc() {
   return (
     <div className="packing-list" style={{ width: '7.5in', background: '#fff', color: '#000', fontFamily: 'Arial, Helvetica, sans-serif', margin: '0 auto' }}>
@@ -415,6 +425,7 @@ export default function PackingList({ data, onClose }) {
   } else if (data.menards) {
     for (let i = 0; i < 3; i++) printPages.push(<BolDoc data={data} key={'b' + i} />);
   }
+  if (data.containerDiagram) printPages.push(<ContainerDiagramDoc key="container" />);
 
   return ReactDOM.createPortal(
     <div className="modal-overlay packing-overlay" onClick={onClose}>
@@ -444,6 +455,7 @@ export default function PackingList({ data, onClose }) {
           {data.nazdar && !data.canada && <NazdarDoc />}
           {data.canada && <UsmcaDoc data={data} />}
           {data.menards && <BolDoc data={data} />}
+          {data.containerDiagram && <ContainerDiagramDoc />}
         </div>
 
         {/* Print output — hidden on screen, revealed by the print stylesheet. */}

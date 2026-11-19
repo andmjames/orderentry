@@ -1,6 +1,7 @@
 import { jsPDF } from 'jspdf';
 import JsBarcode from 'jsbarcode';
 import { LOGO_SRC } from '../logo';
+import { CONTAINER_DIAGRAM_SRC } from '../containerDiagram';
 import { NAZDAR, IMAGE_TECH } from './nazdar';
 import { PLASTIC_PALLET_NOTE } from './plasticPallets';
 import { SIGNATURE_SRC, SIGNATURE_ASPECT } from '../signature';
@@ -324,6 +325,12 @@ export function buildPackingPdf(data) {
   if (data.canada) {
     doc.addPage();
     buildUsmcaPage(doc, data);
+  }
+
+  // APLA container orders: append the 20ft container loading diagram as its own page.
+  if (data.containerDiagram) {
+    doc.addPage();
+    doc.addImage(CONTAINER_DIAGRAM_SRC, 'PNG', 0, 0, 612, 792);
   }
 
   return doc.output('datauristring').split(',')[1];

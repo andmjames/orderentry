@@ -231,6 +231,8 @@ function buildDocs({ customer, shipping, totals, poNumber, invoiceNumber, shipAd
     plasticPallets: isPlasticPalletCustomer(customer.name) && shipping.pallets > 0,
     // Amazon POs carry packing/prep instructions; reproduce them on the packing list.
     packingInstructions: /amazon/i.test(customer.name || '') ? String(packingInstructions || '').trim() : '',
+    // APLA container orders (480+ cases): add the 20ft container loading diagram page.
+    containerDiagram: /\bapla\b/i.test(customer.name || '') && totals.cases >= 480,
     canada: shipsToCanada,
     importerLines: shipToLines(shipAddr, customer.name),
     usmcaItems,

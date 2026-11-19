@@ -106,7 +106,8 @@ Live: https://pmiorder.netlify.app · Repo: andmjames/orderentry
 - **Customer-specific docs**: Ryonet barcode note; Image Technology + Screen Printers Resource
   get the boxed "Do Not Stack" cone/label note; plastic-pallet customer list; Nazdar footer;
   Menards Bill of Lading; Canada/USMCA customs pages; Amazon packing lists reproduce the
-  PO's packing instructions (`analysis.packing_instructions`) in a boxed section.
+  PO's packing instructions (`analysis.packing_instructions`) in a boxed section; APLA orders
+  of 480+ cases add the 20ft container loading diagram (`src/containerDiagram.js`) as a page.
 - Never use PMI's own address (525 Herriman Ct, Noblesville IN 46060) as a ship-to.
 
 ---
